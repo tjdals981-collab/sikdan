@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#3A5443">
+<title>우리집 식단표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --bg:#F6F3EA; --surface:#FFFFFF; --surface-2:#FCFAF3;
+  --ink:#2B2A24; --ink-soft:#76746A; --ink-faint:#A8A599;
+  --green:#3A5443; --green-deep:#2A3E31; --green-tint:#EAF0EA;
+  --orange:#D9663A; --orange-tint:#FBEDE5;
+  --yellow:#D9A23A;
+  --line:#E6E1D3; --line-soft:#EFEBDE;
+  --can:#4F8A5B; --can-bg:#EAF3EB;
+  --partial:#C98A28; --partial-bg:#F8F0DC;
+  --none:#A8A399; --none-bg:#F0EEE6;
+  --shadow:0 1px 3px rgba(60,55,40,.06),0 6px 24px rgba(60,55,40,.05);
+  --radius:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:'Gowun Dodum',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:'Gowun Batang',serif}
+
+/* ---------- 헤더 ---------- */
+header{
+  position:sticky;top:0;z-index:30;
+  background:var(--green); color:#fff;
+  padding:14px 18px 12px;
+  box-shadow:0 2px 12px rgba(42,62,49,.18);
+}
+.brand{display:flex;align-items:baseline;gap:9px}
+.brand h1{font-family:'Gowun Batang',serif;font-size:21px;font-weight:700;letter-spacing:-.3px}
+.brand .sub{font-size:12px;color:#C5D6C8;font-weight:400}
+.brand .sprout{font-size:18px}
+.sync-chip{margin-left:auto;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#EAF0EA;border-radius:20px;padding:5px 11px;font-size:11.5px;font-family:inherit;cursor:pointer;white-space:nowrap;font-weight:700}
+.sync-chip:active{transform:scale(.96)}
+.sync-chip.on{background:#EAF0EA;color:var(--green-deep);border-color:#EAF0EA}
+.sync-chip.err{background:var(--orange-tint);color:var(--orange);border-color:var(--orange)}
+
+/* ---------- 탭바 ---------- */
+nav.tabs{
+  position:sticky;top:0;z-index:20;
+  display:flex;background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+nav.tabs button{
+  flex:1;border:none;background:none;cursor:pointer;
+  padding:11px 4px 9px;font-family:inherit;font-size:12.5px;color:var(--ink-soft);
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  border-bottom:2.5px solid transparent;transition:.15s;
+}
+nav.tabs button .ic{font-size:17px;line-height:1}
+nav.tabs button.active{color:var(--green);border-bottom-color:var(--green);font-weight:700}
+
+main{max-width:760px;margin:0 auto;padding:16px 14px 90px}
+.view{display:none;animation:fade .25s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.section-title{font-family:'Gowun Batang',serif;font-size:17px;font-weight:700;margin:2px 0 10px;display:flex;align-items:center;gap:7px}
+.hint{font-size:12.5px;color:var(--ink-soft);background:var(--surface-2);border:1px dashed var(--line);border-radius:12px;padding:9px 12px;margin-bottom:14px;line-height:1.55}
+
+/* ---------- 주간 플래너 ---------- */
+.week-nav{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 10px;margin-bottom:14px;box-shadow:var(--shadow)}
+.week-nav button{border:none;background:var(--green-tint);color:var(--green-deep);width:34px;height:34px;border-radius:10px;font-size:16px;cursor:pointer;font-family:inherit}
+.week-nav button:active{transform:scale(.94)}
+.week-nav .label{text-align:center;font-size:14px;font-weight:700}
+.week-nav .label .range{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:400;margin-top:1px}
+
+.day-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:11px;overflow:hidden;box-shadow:var(--shadow)}
+.day-card.today{border-color:var(--green);box-shadow:0 0 0 2px var(--green-tint),var(--shadow)}
+.day-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.day-head .dow{font-family:'Gowun Batang',serif;font-size:15px;font-weight:700}
+.day-head .date{font-size:12px;color:var(--ink-soft)}
+.day-head .badge-today{margin-left:auto;font-size:10.5px;background:var(--green);color:#fff;padding:2px 8px;border-radius:20px;font-weight:700}
+.meal-row{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line-soft)}
+.meal-row:last-child{border-bottom:none}
+.meal-label{flex:0 0 46px;font-size:12.5px;color:var(--ink-soft);padding-top:5px;display:flex;align-items:center;gap:3px}
+.meal-items{flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.meal-chip{display:inline-flex;align-items:center;gap:5px;background:var(--green-tint);color:var(--green-deep);border-radius:9px;padding:5px 9px;font-size:13px;cursor:pointer;border:1px solid transparent}
+.meal-chip:active{transform:scale(.97)}
+.meal-chip .x{color:var(--ink-faint);font-size:14px;padding:0 1px;cursor:pointer}
+.meal-chip .x:hover{color:var(--orange)}
+.add-slot{border:1.5px dashed var(--line);background:none;color:var(--ink-faint);border-radius:9px;padding:5px 11px;font-size:13px;cursor:pointer;font-family:inherit}
+.add-slot:active{background:var(--surface-2)}
+
+/* ---------- 메뉴 카드 (둘러보기/즐겨찾기) ---------- */
+.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;margin-bottom:6px;-webkit-overflow-scrolling:touch}
+.filter-bar::-webkit-scrollbar{display:none}
+.chip-filter{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:20px;padding:6px 13px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.chip-filter.active{background:var(--green);color:#fff;border-color:var(--green);font-weight:700}
+.toggle-row{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap}
+.toggle-pill{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;color:var(--ink-soft)}
+.toggle-pill.on{background:var(--can-bg);border-color:var(--can);color:var(--can)}
+
+.menu-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:560px){.menu-grid{grid-template-columns:1fr 1fr}}
+.menu-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;cursor:pointer;box-shadow:var(--shadow);position:relative;transition:.15s}
+.menu-card:active{transform:scale(.99)}
+.menu-card .top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.menu-card .name{font-family:'Gowun Batang',serif;font-size:16px;font-weight:700;line-height:1.3}
+.menu-card .meta{font-size:12px;color:var(--ink-soft);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.menu-card .star{font-size:19px;line-height:1;background:none;border:none;cursor:pointer;padding:0 0 0 4px}
+.status-badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;border-radius:8px;padding:3px 8px;margin-top:9px}
+.status-badge.can{background:var(--can-bg);color:var(--can)}
+.status-badge.partial{background:var(--partial-bg);color:var(--partial)}
+.status-badge.none{background:var(--none-bg);color:var(--none)}
+.missing-line{font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.45}
+.missing-line b{color:var(--orange);font-weight:700}
+.empty{text-align:center;color:var(--ink-faint);padding:42px 18px;font-size:14px;line-height:1.7}
+.empty .big{font-size:34px;display:block;margin-bottom:8px}
+
+/* ---------- 냉장고 ---------- */
+.fridge-input{display:flex;gap:8px;margin-bottom:12px}
+.fridge-input input{flex:1;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:15px;font-family:inherit;background:var(--surface);color:var(--ink)}
+.fridge-input input:focus{outline:none;border-color:var(--green)}
+.fridge-input button{border:none;background:var(--green);color:#fff;border-radius:12px;padding:0 17px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.tag-cloud{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.fridge-tag{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:7px 9px 7px 13px;font-size:14px;box-shadow:var(--shadow)}
+.fridge-tag .x{color:var(--ink-faint);cursor:pointer;font-size:16px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.fridge-tag .x:active{background:var(--orange-tint);color:var(--orange)}
+.quick-label{font-size:12.5px;color:var(--ink-soft);margin:16px 0 9px}
+.quick-add{display:flex;flex-wrap:wrap;gap:7px}
+.quick-add button{border:1px dashed var(--line);background:var(--surface-2);color:var(--ink-soft);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+.quick-add button:active{background:var(--green-tint);border-color:var(--green);color:var(--green)}
+.quick-add button.added{background:var(--green-tint);border-style:solid;border-color:var(--green);color:var(--green)}
+
+/* ---------- 모달 ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(40,38,30,.45);z-index:50;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg);width:100%;max-width:560px;max-height:88vh;border-radius:22px 22px 0 0;overflow-y:auto;animation:slideup .28s cubic-bezier(.2,.8,.3,1);box-shadow:0 -8px 40px rgba(40,38,30,.25)}
+@media(min-width:560px){.modal-bg{align-items:center}.modal{border-radius:22px;max-height:84vh}}
+@keyframes slideup{from{transform:translateY(40px);opacity:.6}to{transform:none;opacity:1}}
+.modal-grip{width:38px;height:4px;background:var(--line);border-radius:4px;margin:9px auto 0}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 18px 10px}
+.modal-head .titles .name{font-family:'Gowun Batang',serif;font-size:21px;font-weight:700;line-height:1.25}
+.modal-head .titles .meta{font-size:12.5px;color:var(--ink-soft);margin-top:5px;display:flex;gap:9px;flex-wrap:wrap}
+.modal-close{border:none;background:var(--surface);width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;color:var(--ink-soft);flex:0 0 auto;box-shadow:var(--shadow)}
+.modal-body{padding:4px 18px 22px}
+.recipe-status{border-radius:12px;padding:10px 13px;margin-bottom:16px;font-size:13px;line-height:1.5}
+.recipe-status.can{background:var(--can-bg);color:var(--can)}
+.recipe-status.partial{background:var(--partial-bg);color:#9a6a16}
+.recipe-status.none{background:var(--none-bg);color:var(--ink-soft)}
+.block-title{font-family:'Gowun Batang',serif;font-size:15px;font-weight:700;margin:18px 0 9px;display:flex;align-items:center;gap:6px}
+.ing-list{display:flex;flex-direction:column;gap:1px;background:var(--surface);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+.ing-item{display:flex;align-items:center;gap:9px;padding:9px 13px;font-size:14px;border-bottom:1px solid var(--line-soft)}
+.ing-item:last-child{border-bottom:none}
+.ing-item .check{flex:0 0 18px;font-size:13px}
+.ing-item .nm{flex:1}
+.ing-item .amt{color:var(--ink-soft);font-size:13px}
+.ing-item.have .nm{color:var(--ink)}
+.ing-item.miss .nm{color:var(--orange);font-weight:700}
+.ing-item.pantry .nm{color:var(--ink-soft)}
+.ing-item .tag-p{font-size:10.5px;color:var(--ink-faint);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
+.steps-list{counter-reset:s;display:flex;flex-direction:column;gap:11px}
+.step{display:flex;gap:11px;font-size:14.5px;line-height:1.55}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 25px;height:25px;background:var(--green);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'Gowun Batang',serif}
+.modal-actions{display:flex;gap:9px;padding:14px 18px 20px;position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 22%)}
+
+/* 우리집 메뉴 추가 버튼 */
+.add-own{width:100%;border:1.5px dashed var(--orange);background:var(--orange-tint);color:var(--orange);border-radius:13px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+.add-own:active{transform:scale(.99)}
+.own-badge{font-size:10.5px;background:var(--orange-tint);color:var(--orange);border:1px solid var(--orange);border-radius:7px;padding:2px 7px;font-weight:700;margin-left:6px;vertical-align:middle}
+
+/* 편집 폼 */
+.ed-field{margin-bottom:14px}
+.ed-field>label{display:block;font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}
+.ed-input,.ed-select{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:15px;font-family:inherit;background:var(--surface);color:var(--ink)}
+.ed-input:focus,.ed-select:focus{outline:none;border-color:var(--green)}
+.ed-two{display:flex;gap:9px}
+.ed-two>div{flex:1}
+.ed-row{display:flex;gap:7px;align-items:center}
+.ed-row .ed-input{flex:1}
+.ed-row .amt{flex:0 0 84px}
+.ed-row .pchk{flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;border:1px solid var(--line);border-radius:9px;padding:8px 9px;cursor:pointer;background:var(--surface)}
+.ed-row .pchk.on{background:var(--green-tint);border-color:var(--green);color:var(--green)}
+.ed-row .pchk input{display:none}
+.ed-row .del{flex:0 0 auto;border:none;background:none;color:var(--ink-faint);font-size:18px;cursor:pointer;padding:4px 6px}
+.ed-row .del:active{color:var(--orange)}
+.ed-row .step-num{flex:0 0 22px;height:22px;background:var(--green);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.ed-add-row{border:1px dashed var(--line);background:var(--surface-2);color:var(--ink-soft);border-radius:10px;padding:9px;font-size:13px;cursor:pointer;font-family:inherit;width:100%}
+.ed-add-row:active{background:var(--green-tint);border-color:var(--green);color:var(--green)}
+.ed-hint{font-size:11.5px;color:var(--ink-faint);margin:5px 2px 0}
+.custom-tools{display:flex;gap:9px;margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
+.custom-tools button{flex:1;border-radius:11px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid var(--line);background:var(--surface)}
+.custom-tools .edit{color:var(--green)}
+.custom-tools .del{color:var(--orange);border-color:var(--orange);background:var(--orange-tint)}
+
+/* 공유 설정 */
+.share-status{border-radius:12px;padding:11px 13px;margin-bottom:15px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:7px}
+.share-status.local{background:var(--none-bg);color:var(--ink-soft)}
+.share-status.synced{background:var(--can-bg);color:var(--can)}
+.share-status.error{background:var(--orange-tint);color:var(--orange)}
+.share-desc{font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin-bottom:14px}
+textarea.ed-input{resize:vertical;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5}
+.btn{flex:1;border:none;border-radius:13px;padding:13px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:active{background:var(--green-deep)}
+.btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn-ghost.starred{background:var(--orange-tint);color:var(--orange);border-color:var(--orange)}
+
+/* 메뉴 고르기 모달 (식단 추가용) */
+.picker-search{padding:6px 18px 12px}
+.picker-search input{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:15px;font-family:inherit;background:var(--surface);color:var(--ink)}
+.picker-search input:focus{outline:none;border-color:var(--green)}
+.picker-list{padding:0 18px 18px;display:flex;flex-direction:column;gap:7px}
+.picker-item{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer}
+.picker-item:active{background:var(--green-tint)}
+.picker-item .nm{font-size:14.5px;font-weight:700}
+.picker-item .sub{font-size:12px;color:var(--ink-soft);margin-left:auto}
+.picker-item .st{font-size:14px}
+
+/* 끼니 선택 미니시트 */
+.dest-grid{padding:6px 18px 20px}
+.dest-day{margin-bottom:10px}
+.dest-day .dn{font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:5px}
+.dest-meals{display:flex;gap:7px}
+.dest-meals button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.dest-meals button:active{background:var(--green-tint);border-color:var(--green)}
+
+/* 토스트 */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green-deep);color:#fff;padding:11px 20px;border-radius:30px;font-size:13.5px;z-index:80;opacity:0;transition:.3s;pointer-events:none;box-shadow:0 6px 20px rgba(40,38,30,.3);white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{text-align:center;font-size:11px;color:var(--ink-faint);padding:8px 0 4px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="sprout">🌿</span>
+    <h1>우리집 식단표</h1>
+    <span class="sub">오늘 뭐 먹지?</span>
+    <button class="sync-chip" id="syncChip" title="부부 공유 설정">📱 이 기기</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="plan" class="active"><span class="ic">📅</span>주간 식단</button>
+  <button data-tab="browse"><span class="ic">🍳</span>메뉴 찾기</button>
+  <button data-tab="fridge"><span class="ic">🧊</span>냉장고</button>
+  <button data-tab="fav"><span class="ic">⭐</span>즐겨찾기</button>
+</nav>
+
+<main>
+  <!-- 주간 식단 -->
+  <section class="view active" id="view-plan">
+    <div class="week-nav">
+      <button id="weekPrev">‹</button>
+      <div class="label" id="weekLabel">이번 주<span class="range" id="weekRange"></span></div>
+      <button id="weekNext">›</button>
+    </div>
+    <div id="weekDays"></div>
+  </section>
+
+  <!-- 메뉴 찾기 -->
+  <section class="view" id="view-browse">
+    <div class="hint" id="browseHint"></div>
+    <button class="add-own" id="addOwnBtn">➕ 우리집 메뉴 직접 추가</button>
+    <div class="toggle-row">
+      <button class="toggle-pill" id="tgCan">🟢 지금 만들 수 있는 것만</button>
+    </div>
+    <div class="filter-bar" id="cuisineFilter"></div>
+    <div class="menu-grid" id="browseGrid"></div>
+  </section>
+
+  <!-- 냉장고 -->
+  <section class="view" id="view-fridge">
+    <div class="section-title">🧊 우리집 냉장고</div>
+    <div class="hint">지금 있는 재료를 넣어두면, <b>메뉴 찾기</b>에서 만들 수 있는 요리를 골라드려요. 소금·간장·식용유 같은 기본 양념은 늘 있다고 보고 계산해요.</div>
+    <div class="fridge-input">
+      <input id="fridgeInput" type="text" placeholder="예: 돼지고기, 양파, 두부" autocomplete="off">
+      <button id="fridgeAdd">담기</button>
+    </div>
+    <div class="tag-cloud" id="fridgeTags"></div>
+    <div class="quick-label">자주 쓰는 재료 — 눌러서 빠르게 담기</div>
+    <div class="quick-add" id="quickAdd"></div>
+  </section>
+
+  <!-- 즐겨찾기 -->
+  <section class="view" id="view-fav">
+    <div class="section-title">⭐ 우리집 시그니처</div>
+    <div class="hint">자주 해 먹는 메뉴에 별을 달아두면 여기 모여요. 식단 짤 때 제일 먼저 보여드릴게요.</div>
+    <div class="menu-grid" id="favGrid"></div>
+  </section>
+
+  <footer>🌿 우리집 식단표 · 기기에 자동 저장돼요</footer>
+</main>
+
+<!-- 레시피 상세 모달 -->
+<div class="modal-bg" id="recipeModal">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-head">
+      <div class="titles">
+        <div class="name" id="rmName"></div>
+        <div class="meta" id="rmMeta"></div>
+      </div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body" id="rmBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="rmStar">⭐ 즐겨찾기</button>
+      <button class="btn btn-primary" id="rmAddPlan">📅 식단에 담기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메뉴 고르기 모달 (슬롯 → 메뉴) -->
+<div class="modal-bg" id="pickerModal">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-head">
+      <div class="titles"><div class="name serif" id="pickerTitle">메뉴 고르기</div></div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="picker-search"><input id="pickerSearch" type="text" placeholder="메뉴 이름 검색" autocomplete="off"></div>
+    <div class="picker-list" id="pickerList"></div>
+  </div>
+</div>
+
+<!-- 끼니 선택 모달 (메뉴 → 슬롯) -->
+<div class="modal-bg" id="destModal">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-head">
+      <div class="titles"><div class="name serif" id="destTitle">어디에 담을까요?</div></div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="dest-grid" id="destGrid"></div>
+  </div>
+</div>
+
+<!-- 우리집 메뉴 추가/편집 모달 -->
+<div class="modal-bg" id="editorModal">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-head">
+      <div class="titles"><div class="name serif" id="editorTitle">우리집 메뉴 추가</div></div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="ed-field">
+        <label>메뉴 이름</label>
+        <input class="ed-input" id="edName" type="text" placeholder="예: 엄마표 김치찜" autocomplete="off">
+      </div>
+      <div class="ed-field ed-two">
+        <div><label>분류</label>
+          <select class="ed-select" id="edCuisine">
+            <option>우리집</option><option>한식</option><option>중식</option><option>일식</option><option>양식</option><option>동남아</option><option>분식</option><option>샐러드</option><option>인도·중동</option><option>멕시칸</option>
+          </select>
+        </div>
+        <div><label>종류</label>
+          <select class="ed-select" id="edCat">
+            <option>밥·면</option><option>국·찌개</option><option>볶음·구이</option><option>반찬</option><option>분식·간식</option><option>샐러드·가벼운</option>
+          </select>
+        </div>
+      </div>
+      <div class="ed-field ed-two">
+        <div><label>조리시간 (분)</label>
+          <input class="ed-input" id="edTime" type="number" inputmode="numeric" placeholder="30" min="1">
+        </div>
+        <div><label>난이도</label>
+          <select class="ed-select" id="edLevel"><option>쉬움</option><option>보통</option><option>어려움</option></select>
+        </div>
+      </div>
+
+      <div class="ed-field">
+        <label>재료</label>
+        <div id="edIngRows"></div>
+        <button class="ed-add-row" id="edAddIng">+ 재료 추가</button>
+        <div class="ed-hint">소금·간장·기름처럼 늘 있는 양념은 '기본양념'을 켜두면 메뉴 추천 계산에서 빠져요.</div>
+      </div>
+
+      <div class="ed-field">
+        <label>만드는 법</label>
+        <div id="edStepRows"></div>
+        <button class="ed-add-row" id="edAddStep">+ 순서 추가</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>취소</button>
+      <button class="btn btn-primary" id="edSave">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 부부 공유 설정 모달 -->
+<div class="modal-bg" id="shareModal">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <div class="modal-head">
+      <div class="titles"><div class="name serif">👩‍❤️‍👨 부부 공유 설정</div></div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="share-status" id="shareStatus"></div>
+      <div id="shareDisconnected">
+        <p class="share-desc">가계부 만들 때 쓰던 <b>Firebase 설정</b>을 그대로 붙여넣으면, 두 사람 기기가 같은 식단·메뉴를 실시간으로 함께 봐요. (같은 Firebase 프로젝트를 써도 가계부와 데이터는 섞이지 않아요.)</p>
+        <div class="ed-field">
+          <label>Firebase 설정 붙여넣기</label>
+          <textarea class="ed-input" id="shareCfg" rows="9" placeholder="const firebaseConfig = {&#10;  apiKey: &quot;...&quot;,&#10;  authDomain: &quot;...&quot;,&#10;  projectId: &quot;...&quot;,&#10;  ...&#10;};"></textarea>
+          <div class="ed-hint">Firebase 콘솔 → 프로젝트 설정 → '내 앱'의 SDK 설정에 있는 firebaseConfig 부분을 통째로 복사해 붙여넣으면 돼요.</div>
+        </div>
+      </div>
+      <div id="shareConnected" style="display:none">
+        <p class="share-desc">연결되어 있어요. 식단을 바꾸면 두 사람 기기에 바로 반영돼요. 같은 설정을 유진님 기기에도 한 번 넣어두면 끝이에요.</p>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="shareDisconnect" style="display:none">연결 해제</button>
+      <button class="btn btn-primary" id="shareConnect">🔗 연결하기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 우리집 식단표 - 기본 레시피 데이터베이스 =====
+// ingredients: { name, amount, pantry(기본양념이면 true) }
+// pantry 재료(소금/간장/식용유 등)는 "냉장고에 늘 있다"고 가정하고 매칭에서 제외합니다.
+const DEFAULT_RECIPES = [
+  // ---------- 한식 ----------
+  { id:'kr01', name:'김치찌개', cuisine:'한식', cat:'국·찌개', time:25, level:'쉬움',
+    ing:[{n:'신김치',a:'1/4포기'},{n:'돼지고기',a:'200g'},{n:'두부',a:'1/2모'},{n:'대파',a:'1대'},{n:'양파',a:'1/2개'},{n:'고춧가루',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'1큰술',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['냄비에 식용유를 두르고 돼지고기를 볶다가 신김치를 넣어 함께 볶는다.','물 3컵을 붓고 고춧가루, 다진마늘을 넣어 끓인다.','끓어오르면 두부, 양파, 대파를 넣고 국간장으로 간한다.','중불에서 10분 더 끓여 김치가 푹 익으면 완성.'] },
+  { id:'kr02', name:'된장찌개', cuisine:'한식', cat:'국·찌개', time:20, level:'쉬움',
+    ing:[{n:'된장',a:'2큰술',p:1},{n:'두부',a:'1/2모'},{n:'애호박',a:'1/3개'},{n:'양파',a:'1/2개'},{n:'감자',a:'1개'},{n:'대파',a:'1대'},{n:'다진마늘',a:'1/2큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1}],
+    steps:['멸치육수나 물 3컵에 된장을 풀어 끓인다.','감자, 양파를 먼저 넣고 끓이다 애호박을 넣는다.','다진마늘, 고춧가루를 넣는다.','두부와 대파를 넣고 한소끔 끓이면 완성.'] },
+  { id:'kr03', name:'제육볶음', cuisine:'한식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'돼지고기 앞다리살',a:'400g'},{n:'양파',a:'1개'},{n:'대파',a:'1대'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'간장',a:'1.5큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'참기름',a:'약간',p:1}],
+    steps:['고추장, 고춧가루, 간장, 설탕, 다진마늘로 양념장을 만든다.','돼지고기에 양념장을 버무려 15분 재운다.','달군 팬에 고기를 볶다가 양파, 대파를 넣는다.','고기가 익고 양념이 졸아들면 참기름을 둘러 마무리.'] },
+  { id:'kr04', name:'소불고기', cuisine:'한식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'소고기 불고기감',a:'400g'},{n:'양파',a:'1개'},{n:'당근',a:'1/3개'},{n:'대파',a:'1대'},{n:'간장',a:'4큰술',p:1},{n:'설탕',a:'1.5큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'배',a:'1/4개'}],
+    steps:['간장, 설탕, 다진마늘, 참기름과 갈은 배로 양념을 만든다.','소고기를 양념에 30분 재운다.','팬에 고기와 채 썬 채소를 함께 볶는다.','국물이 자작하게 졸아들면 완성.'] },
+  { id:'kr05', name:'계란말이', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'계란',a:'4개'},{n:'대파',a:'1/3대'},{n:'당근',a:'약간'},{n:'소금',a:'약간',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['계란을 곱게 풀고 잘게 썬 대파, 당근, 소금을 넣어 섞는다.','약불로 달군 팬에 기름을 두르고 계란물을 얇게 붓는다.','반쯤 익으면 한쪽부터 돌돌 말아준다.','남은 계란물을 부어가며 두툼하게 말아 완성.'] },
+  { id:'kr06', name:'김치볶음밥', cuisine:'한식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'신김치',a:'1컵'},{n:'계란',a:'2개'},{n:'대파',a:'1/2대'},{n:'고춧가루',a:'1/2큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'2큰술',p:1},{n:'참기름',a:'약간',p:1}],
+    steps:['팬에 기름을 두르고 잘게 썬 김치를 볶는다.','고춧가루, 간장을 넣고 더 볶는다.','밥을 넣고 잘 비비며 볶는다.','참기름을 두르고 그릇에 담은 뒤 계란프라이를 올린다.'] },
+  { id:'kr07', name:'미역국', cuisine:'한식', cat:'국·찌개', time:30, level:'쉬움',
+    ing:[{n:'마른미역',a:'한줌'},{n:'소고기 양지',a:'150g'},{n:'국간장',a:'2큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['미역은 물에 20분 불려 씻고 한입 크기로 썬다.','냄비에 참기름을 두르고 소고기와 미역을 볶는다.','물 5컵을 붓고 센불로 끓인다.','국간장, 다진마늘로 간하고 20분 더 끓인다.'] },
+  { id:'kr08', name:'콩나물국', cuisine:'한식', cat:'국·찌개', time:15, level:'쉬움',
+    ing:[{n:'콩나물',a:'200g'},{n:'대파',a:'1/2대'},{n:'다진마늘',a:'1/2큰술',p:1},{n:'국간장',a:'1큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['냄비에 물 4컵과 콩나물을 넣고 뚜껑을 덮어 끓인다.','끓기 시작하면 다진마늘을 넣는다.','국간장과 소금으로 간한다.','대파를 넣고 한소끔 끓여 완성.'] },
+  { id:'kr09', name:'두부조림', cuisine:'한식', cat:'반찬', time:20, level:'쉬움',
+    ing:[{n:'두부',a:'1모'},{n:'대파',a:'1/2대'},{n:'간장',a:'2큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'설탕',a:'1/2큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['두부를 1cm 두께로 썰어 노릇하게 굽는다.','간장, 고춧가루, 설탕, 다진마늘, 물 1/2컵으로 양념장을 만든다.','구운 두부에 양념장을 끼얹고 약불로 졸인다.','대파를 올리고 국물이 자작해지면 완성.'] },
+  { id:'kr10', name:'어묵볶음', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'사각어묵',a:'4장'},{n:'양파',a:'1/2개'},{n:'당근',a:'1/4개'},{n:'대파',a:'1/3대'},{n:'간장',a:'1.5큰술',p:1},{n:'설탕',a:'1/2큰술',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['어묵은 먹기 좋게 썰고 채소도 채 썬다.','팬에 기름을 두르고 양파, 당근을 볶는다.','어묵을 넣고 간장, 설탕으로 간한다.','대파를 넣고 살짝 더 볶아 완성.'] },
+  { id:'kr11', name:'잡채', cuisine:'한식', cat:'밥·면', time:40, level:'보통',
+    ing:[{n:'당면',a:'150g'},{n:'소고기',a:'100g'},{n:'시금치',a:'한줌'},{n:'당근',a:'1/3개'},{n:'양파',a:'1/2개'},{n:'표고버섯',a:'3개'},{n:'간장',a:'4큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'참기름',a:'2큰술',p:1}],
+    steps:['당면은 삶아 찬물에 헹구고 간장, 참기름에 무친다.','채소와 고기를 각각 채 썰어 볶는다.','시금치는 데쳐 무친다.','모든 재료를 당면과 함께 버무리고 간장, 설탕, 참기름으로 간한다.'] },
+  { id:'kr12', name:'비빔국수', cuisine:'한식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'소면',a:'2인분'},{n:'오이',a:'1/2개'},{n:'계란',a:'2개'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'식초',a:'1.5큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'간장',a:'1큰술',p:1}],
+    steps:['고추장, 고춧가루, 식초, 설탕, 간장으로 양념장을 만든다.','소면을 삶아 찬물에 헹군다.','면에 양념장을 넣고 비빈다.','채 썬 오이와 삶은 계란을 올려 완성.'] },
+  { id:'kr13', name:'순두부찌개', cuisine:'한식', cat:'국·찌개', time:20, level:'보통',
+    ing:[{n:'순두부',a:'1봉'},{n:'바지락',a:'한줌'},{n:'계란',a:'1개'},{n:'대파',a:'1/2대'},{n:'고춧가루',a:'2큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'1큰술',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['뚝배기에 기름을 두르고 고춧가루를 볶아 고추기름을 낸다.','물 2컵과 바지락을 넣고 끓인다.','순두부를 큼직하게 떠 넣고 다진마늘, 국간장으로 간한다.','계란을 풀어 넣고 대파를 올려 완성.'] },
+  { id:'kr14', name:'오징어볶음', cuisine:'한식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'오징어',a:'2마리'},{n:'양파',a:'1개'},{n:'대파',a:'1대'},{n:'양배추',a:'1/4통'},{n:'고추장',a:'1.5큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['오징어는 손질해 칼집을 넣고 먹기 좋게 썬다.','고추장, 고춧가루, 간장, 설탕, 마늘로 양념을 만든다.','팬에 채소를 볶다가 오징어와 양념을 넣는다.','센불에서 빠르게 볶아 완성.'] },
+  { id:'kr15', name:'갈비찜', cuisine:'한식', cat:'볶음·구이', time:90, level:'어려움',
+    ing:[{n:'소갈비',a:'1kg'},{n:'무',a:'1/4개'},{n:'당근',a:'1개'},{n:'양파',a:'1개'},{n:'대추',a:'5개'},{n:'간장',a:'6큰술',p:1},{n:'설탕',a:'3큰술',p:1},{n:'다진마늘',a:'2큰술',p:1},{n:'배',a:'1/2개'}],
+    steps:['갈비는 찬물에 1시간 핏물을 뺀 뒤 한 번 끓여 헹군다.','간장, 설탕, 마늘, 갈은 배로 양념을 만든다.','갈비에 양념과 물을 넣고 센불에 끓이다 약불로 줄인다.','무, 당근, 양파, 대추를 넣고 1시간 푹 졸인다.'] },
+
+  // ---------- 중식 ----------
+  { id:'cn01', name:'마파두부', cuisine:'중식', cat:'볶음·구이', time:20, level:'보통',
+    ing:[{n:'두부',a:'1모'},{n:'다진 돼지고기',a:'150g'},{n:'대파',a:'1대'},{n:'두반장',a:'1.5큰술'},{n:'간장',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1},{n:'전분물',a:'약간',p:1}],
+    steps:['두부는 깍둑썰기하고 끓는 물에 살짝 데친다.','팬에 다진 고기를 볶다가 마늘, 두반장을 넣는다.','물 1컵, 간장, 고춧가루를 넣고 끓인다.','두부를 넣고 전분물로 농도를 맞춘 뒤 대파를 올린다.'] },
+  { id:'cn02', name:'토마토계란볶음', cuisine:'중식', cat:'볶음·구이', time:15, level:'쉬움',
+    ing:[{n:'토마토',a:'2개'},{n:'계란',a:'3개'},{n:'대파',a:'1/2대'},{n:'설탕',a:'1/2큰술',p:1},{n:'소금',a:'약간',p:1},{n:'식용유',a:'2큰술',p:1}],
+    steps:['토마토는 큼직하게 썰고 계란은 소금 넣어 푼다.','팬에 기름을 넉넉히 두르고 계란을 부드럽게 익혀 덜어둔다.','같은 팬에 토마토를 볶고 설탕, 소금으로 간한다.','계란을 다시 넣어 살짝 섞고 대파를 올려 완성.'] },
+  { id:'cn03', name:'간짜장', cuisine:'중식', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'중화면',a:'2인분'},{n:'돼지고기',a:'150g'},{n:'양파',a:'1개'},{n:'양배추',a:'1/4통'},{n:'춘장',a:'3큰술'},{n:'설탕',a:'1큰술',p:1},{n:'전분물',a:'약간',p:1},{n:'식용유',a:'3큰술',p:1}],
+    steps:['춘장을 기름에 볶아 잡내를 날린다.','다른 팬에 고기와 채소를 볶는다.','볶은 춘장과 설탕을 넣고 물을 약간 부어 끓인다.','전분물로 농도를 맞추고 삶은 면 위에 올린다.'] },
+  { id:'cn04', name:'새우볶음밥', cuisine:'중식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'새우',a:'10마리'},{n:'계란',a:'2개'},{n:'대파',a:'1대'},{n:'당근',a:'1/4개'},{n:'굴소스',a:'1큰술'},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'3큰술',p:1}],
+    steps:['팬에 기름을 두르고 계란을 스크램블한 뒤 새우를 볶는다.','대파, 당근을 넣어 볶는다.','밥을 넣고 굴소스, 간장으로 간하며 센불에 볶는다.','고슬고슬하게 볶아 완성.'] },
+  { id:'cn05', name:'깐풍기', cuisine:'중식', cat:'볶음·구이', time:35, level:'어려움',
+    ing:[{n:'닭다리살',a:'400g'},{n:'대파',a:'1대'},{n:'마른고추',a:'3개'},{n:'간장',a:'2큰술',p:1},{n:'식초',a:'2큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'전분',a:'1컵',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['닭은 한입 크기로 썰어 밑간 후 전분 입혀 두 번 튀긴다.','간장, 식초, 설탕, 물로 깐풍소스를 만든다.','팬에 마늘, 마른고추를 볶아 향을 낸다.','소스를 끓이고 튀긴 닭과 대파를 넣어 버무린다.'] },
+
+  // ---------- 일식 ----------
+  { id:'jp01', name:'가츠동', cuisine:'일식', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'돈가스',a:'2장'},{n:'양파',a:'1개'},{n:'계란',a:'3개'},{n:'밥',a:'2공기'},{n:'쪽파',a:'약간'},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'맛술',a:'2큰술',p:1}],
+    steps:['돈가스를 미리 튀겨 한입 크기로 썬다.','팬에 물 1컵, 간장, 설탕, 맛술과 양파를 넣고 끓인다.','돈가스를 올리고 풀어둔 계란을 둘러 붓는다.','계란이 반숙으로 익으면 밥 위에 올리고 쪽파를 뿌린다.'] },
+  { id:'jp02', name:'규동', cuisine:'일식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'소고기 차돌박이',a:'250g'},{n:'양파',a:'1개'},{n:'밥',a:'2공기'},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1.5큰술',p:1},{n:'맛술',a:'2큰술',p:1},{n:'생강',a:'약간'}],
+    steps:['팬에 물 1컵, 간장, 설탕, 맛술, 생강을 넣고 끓인다.','채 썬 양파를 넣어 부드럽게 익힌다.','소고기를 넣고 익을 때까지 졸인다.','밥 위에 올려 완성. 반숙란을 곁들이면 좋다.'] },
+  { id:'jp03', name:'연어덮밥', cuisine:'일식', cat:'밥·면', time:10, level:'쉬움',
+    ing:[{n:'생연어',a:'200g'},{n:'밥',a:'2공기'},{n:'아보카도',a:'1개'},{n:'간장',a:'2큰술',p:1},{n:'와사비',a:'약간'},{n:'쪽파',a:'약간'},{n:'참기름',a:'약간',p:1}],
+    steps:['연어와 아보카도를 먹기 좋게 슬라이스한다.','간장, 와사비, 참기름으로 양념장을 만든다.','밥 위에 연어와 아보카도를 보기 좋게 올린다.','양념장을 뿌리고 쪽파를 올려 완성.'] },
+  { id:'jp04', name:'일본식 카레', cuisine:'일식', cat:'밥·면', time:40, level:'쉬움',
+    ing:[{n:'카레가루',a:'1/2박스'},{n:'돼지고기',a:'300g'},{n:'감자',a:'2개'},{n:'당근',a:'1개'},{n:'양파',a:'2개'},{n:'밥',a:'2공기'},{n:'식용유',a:'약간',p:1}],
+    steps:['고기와 채소를 한입 크기로 썬다.','팬에 기름을 두르고 고기, 양파를 볶는다.','감자, 당근을 넣고 물을 부어 푹 끓인다.','불을 끄고 카레를 풀어 다시 약불로 농도를 맞춘 뒤 밥과 낸다.'] },
+  { id:'jp05', name:'야키소바', cuisine:'일식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'중화면',a:'2인분'},{n:'양배추',a:'1/4통'},{n:'양파',a:'1/2개'},{n:'당근',a:'1/3개'},{n:'돼지고기',a:'150g'},{n:'돈가스소스',a:'4큰술'},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'2큰술',p:1}],
+    steps:['면은 살짝 삶아 둔다.','팬에 고기와 채소를 볶는다.','면을 넣고 돈가스소스, 간장으로 간한다.','센불에서 골고루 볶아 완성. 가츠오부시를 올려도 좋다.'] },
+  { id:'jp06', name:'오야코동', cuisine:'일식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'닭다리살',a:'250g'},{n:'양파',a:'1개'},{n:'계란',a:'3개'},{n:'밥',a:'2공기'},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'맛술',a:'2큰술',p:1},{n:'쪽파',a:'약간'}],
+    steps:['닭은 한입 크기로 썬다.','팬에 물 1컵, 간장, 설탕, 맛술과 양파를 끓인다.','닭을 넣어 익히고 풀어둔 계란을 둘러 붓는다.','반숙으로 익으면 밥에 올리고 쪽파를 뿌린다.'] },
+
+  // ---------- 양식 ----------
+  { id:'we01', name:'토마토 파스타', cuisine:'양식', cat:'밥·면', time:25, level:'쉬움',
+    ing:[{n:'스파게티면',a:'200g'},{n:'토마토소스',a:'2컵'},{n:'양파',a:'1/2개'},{n:'마늘',a:'4쪽'},{n:'베이컨',a:'4줄'},{n:'올리브유',a:'2큰술',p:1},{n:'소금',a:'약간',p:1},{n:'파르메산치즈',a:'약간'}],
+    steps:['면은 소금 넣은 물에 알덴테로 삶는다.','팬에 올리브유, 마늘, 양파를 볶고 베이컨을 넣는다.','토마토소스를 붓고 끓인다.','삶은 면을 넣어 버무리고 치즈를 뿌려 완성.'] },
+  { id:'we02', name:'까르보나라', cuisine:'양식', cat:'밥·면', time:25, level:'보통',
+    ing:[{n:'스파게티면',a:'200g'},{n:'베이컨',a:'5줄'},{n:'계란노른자',a:'3개'},{n:'파르메산치즈',a:'1컵'},{n:'마늘',a:'2쪽'},{n:'후추',a:'넉넉히',p:1},{n:'올리브유',a:'1큰술',p:1}],
+    steps:['면을 삶고 면수를 남겨둔다.','팬에 베이컨과 마늘을 바삭하게 굽는다.','노른자, 치즈, 후추를 섞어 소스를 만든다.','불을 끈 팬에 면, 소스, 면수를 넣고 빠르게 비벼 농도를 맞춘다.'] },
+  { id:'we03', name:'알리오 올리오', cuisine:'양식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'스파게티면',a:'200g'},{n:'마늘',a:'6쪽'},{n:'페페론치노',a:'4개'},{n:'올리브유',a:'5큰술',p:1},{n:'소금',a:'약간',p:1},{n:'파슬리',a:'약간'}],
+    steps:['면을 소금물에 삶고 면수를 남겨둔다.','팬에 올리브유와 편 썬 마늘을 약불로 볶는다.','페페론치노를 넣어 향을 낸다.','면과 면수를 넣고 유화시킨 뒤 파슬리를 뿌린다.'] },
+  { id:'we04', name:'함박스테이크', cuisine:'양식', cat:'볶음·구이', time:35, level:'보통',
+    ing:[{n:'다진 소고기',a:'300g'},{n:'다진 돼지고기',a:'150g'},{n:'양파',a:'1개'},{n:'빵가루',a:'1/2컵'},{n:'계란',a:'1개'},{n:'우유',a:'3큰술'},{n:'케첩',a:'3큰술',p:1},{n:'돈가스소스',a:'2큰술'}],
+    steps:['양파를 볶아 식히고 다진 고기, 빵가루, 계란, 우유와 섞어 반죽한다.','공기를 빼며 타원형으로 빚는다.','팬에 굽다가 뚜껑을 덮어 속까지 익힌다.','케첩과 돈가스소스로 소스를 만들어 끼얹는다.'] },
+  { id:'we05', name:'오므라이스', cuisine:'양식', cat:'밥·면', time:25, level:'보통',
+    ing:[{n:'밥',a:'2공기'},{n:'계란',a:'4개'},{n:'양파',a:'1/2개'},{n:'당근',a:'1/4개'},{n:'소시지',a:'3개'},{n:'케첩',a:'4큰술',p:1},{n:'버터',a:'1큰술'},{n:'소금',a:'약간',p:1}],
+    steps:['채소와 소시지를 잘게 썰어 볶는다.','밥과 케첩을 넣어 볶아 케첩라이스를 만든다.','계란을 풀어 부드럽게 지단을 부친다.','케첩라이스를 지단으로 감싸고 케첩을 뿌려 완성.'] },
+  { id:'we06', name:'크림 리조또', cuisine:'양식', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'쌀',a:'1.5컵'},{n:'양송이버섯',a:'5개'},{n:'양파',a:'1/2개'},{n:'생크림',a:'1컵'},{n:'파르메산치즈',a:'1/2컵'},{n:'버터',a:'2큰술'},{n:'마늘',a:'2쪽'},{n:'소금',a:'약간',p:1}],
+    steps:['버터에 마늘, 양파, 버섯을 볶는다.','씻지 않은 쌀을 넣고 볶다가 따뜻한 물을 조금씩 부어가며 익힌다.','쌀이 익으면 생크림을 넣어 끓인다.','치즈와 소금으로 간하고 농도를 맞춰 완성.'] },
+  { id:'we07', name:'치킨 스테이크', cuisine:'양식', cat:'볶음·구이', time:25, level:'쉬움',
+    ing:[{n:'닭다리살',a:'2조각'},{n:'감자',a:'2개'},{n:'브로콜리',a:'1/2개'},{n:'마늘',a:'4쪽'},{n:'올리브유',a:'2큰술',p:1},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1},{n:'버터',a:'1큰술'}],
+    steps:['닭다리살에 소금, 후추로 밑간한다.','팬에 껍질부터 바삭하게 굽는다.','마늘, 버터를 넣고 풍미를 더한다.','삶은 감자와 브로콜리를 곁들여 완성.'] },
+  { id:'we08', name:'감바스 알 아히요', cuisine:'양식', cat:'볶음·구이', time:15, level:'쉬움',
+    ing:[{n:'새우',a:'15마리'},{n:'마늘',a:'8쪽'},{n:'페페론치노',a:'3개'},{n:'올리브유',a:'1컵',p:1},{n:'소금',a:'약간',p:1},{n:'바게트',a:'적당량'}],
+    steps:['새우는 손질해 소금으로 밑간한다.','작은 팬에 올리브유, 편마늘, 페페론치노를 약불로 데운다.','마늘향이 나면 새우를 넣어 익힌다.','바게트를 곁들여 오일에 찍어 먹는다.'] },
+
+  // ---------- 동남아 ----------
+  { id:'sa01', name:'팟타이', cuisine:'동남아', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'쌀국수면',a:'200g'},{n:'새우',a:'8마리'},{n:'계란',a:'2개'},{n:'숙주',a:'2줌'},{n:'쪽파',a:'약간'},{n:'땅콩',a:'약간'},{n:'피쉬소스',a:'2큰술'},{n:'설탕',a:'1.5큰술',p:1},{n:'식초',a:'1큰술',p:1}],
+    steps:['쌀국수는 미지근한 물에 30분 불린다.','피쉬소스, 설탕, 식초로 소스를 만든다.','팬에 새우와 계란을 볶고 면, 소스를 넣어 볶는다.','숙주, 쪽파를 넣고 다진 땅콩을 뿌려 완성.'] },
+  { id:'sa02', name:'나시고렝', cuisine:'동남아', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'닭고기',a:'150g'},{n:'계란',a:'2개'},{n:'양파',a:'1/2개'},{n:'마늘',a:'3쪽'},{n:'굴소스',a:'1큰술'},{n:'간장',a:'1.5큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1},{n:'식용유',a:'2큰술',p:1}],
+    steps:['팬에 마늘, 양파, 닭고기를 볶는다.','밥을 넣고 굴소스, 간장, 고춧가루로 간한다.','센불에서 볶아 그릇에 담는다.','계란프라이를 올려 완성.'] },
+  { id:'sa03', name:'분짜', cuisine:'동남아', cat:'밥·면', time:35, level:'보통',
+    ing:[{n:'돼지고기 목살',a:'300g'},{n:'쌀국수면',a:'150g'},{n:'상추',a:'적당량'},{n:'당근',a:'1/2개'},{n:'피쉬소스',a:'3큰술'},{n:'설탕',a:'2큰술',p:1},{n:'식초',a:'2큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['목살을 피쉬소스, 설탕, 마늘에 재워 굽는다.','피쉬소스, 설탕, 식초, 물로 느억맘 소스를 만든다.','쌀국수는 삶아 헹군다.','구운 고기를 소스에 담그고 면, 채소와 함께 먹는다.'] },
+  { id:'sa04', name:'똠얌꿍', cuisine:'동남아', cat:'국·찌개', time:30, level:'보통',
+    ing:[{n:'새우',a:'10마리'},{n:'양송이버섯',a:'5개'},{n:'토마토',a:'1개'},{n:'레몬그라스',a:'2대'},{n:'똠얌페이스트',a:'2큰술'},{n:'코코넛밀크',a:'1/2컵'},{n:'피쉬소스',a:'1큰술'},{n:'라임',a:'1개'}],
+    steps:['물에 레몬그라스를 넣어 끓여 향을 낸다.','똠얌페이스트를 풀고 버섯, 토마토를 넣는다.','새우를 넣어 익히고 코코넛밀크를 넣는다.','피쉬소스, 라임즙으로 간을 맞춰 완성.'] },
+
+  // ---------- 분식·간단 ----------
+  { id:'sn01', name:'떡볶이', cuisine:'분식', cat:'분식·간식', time:20, level:'쉬움',
+    ing:[{n:'떡볶이떡',a:'400g'},{n:'어묵',a:'3장'},{n:'대파',a:'1대'},{n:'양배추',a:'1/4통'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'간장',a:'1큰술',p:1}],
+    steps:['냄비에 물 3컵과 고추장, 고춧가루, 설탕, 간장을 푼다.','떡과 어묵을 넣고 끓인다.','양배추를 넣고 떡이 말랑해질 때까지 졸인다.','대파를 넣고 한소끔 끓여 완성.'] },
+  { id:'sn02', name:'김밥', cuisine:'분식', cat:'분식·간식', time:30, level:'보통',
+    ing:[{n:'밥',a:'3공기'},{n:'김',a:'4장'},{n:'단무지',a:'4줄'},{n:'당근',a:'1개'},{n:'시금치',a:'한줌'},{n:'계란',a:'3개'},{n:'맛살',a:'4개'},{n:'참기름',a:'2큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['밥에 참기름, 소금을 넣어 밑간한다.','당근볶음, 계란지단, 데친 시금치 등 속재료를 준비한다.','김 위에 밥을 펴고 속재료를 올려 단단히 만다.','참기름을 바르고 먹기 좋게 썬다.'] },
+  { id:'sn03', name:'라볶이', cuisine:'분식', cat:'분식·간식', time:15, level:'쉬움',
+    ing:[{n:'떡볶이떡',a:'200g'},{n:'라면',a:'1개'},{n:'어묵',a:'2장'},{n:'대파',a:'1/2대'},{n:'고추장',a:'1.5큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1}],
+    steps:['냄비에 물과 고추장, 고춧가루, 설탕을 풀어 끓인다.','떡과 어묵을 넣어 끓인다.','라면과 스프 절반을 넣는다.','면이 익으면 대파를 올려 완성.'] },
+  { id:'sn04', name:'계란볶음밥', cuisine:'분식', cat:'밥·면', time:10, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'계란',a:'3개'},{n:'대파',a:'1대'},{n:'간장',a:'1큰술',p:1},{n:'굴소스',a:'1/2큰술'},{n:'식용유',a:'3큰술',p:1}],
+    steps:['팬에 기름을 두르고 대파를 볶아 파기름을 낸다.','계란을 풀어 넣고 스크램블한다.','밥을 넣고 간장, 굴소스로 간하며 볶는다.','고슬고슬하게 볶아 완성.'] },
+
+  // ---------- 샐러드·가벼운 ----------
+  { id:'sl01', name:'연어 포케볼', cuisine:'샐러드', cat:'샐러드·가벼운', time:15, level:'쉬움',
+    ing:[{n:'생연어',a:'200g'},{n:'밥',a:'1공기'},{n:'아보카도',a:'1개'},{n:'오이',a:'1/2개'},{n:'적양파',a:'1/4개'},{n:'간장',a:'2큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'마요네즈',a:'약간',p:1}],
+    steps:['연어를 깍둑썰기해 간장, 참기름에 살짝 무친다.','아보카도, 오이, 적양파를 썬다.','볼에 밥을 담고 재료를 보기 좋게 올린다.','마요네즈를 살짝 뿌려 완성.'] },
+  { id:'sl02', name:'카프레제', cuisine:'샐러드', cat:'샐러드·가벼운', time:10, level:'쉬움',
+    ing:[{n:'토마토',a:'2개'},{n:'생모짜렐라',a:'1개'},{n:'바질',a:'적당량'},{n:'올리브유',a:'2큰술',p:1},{n:'발사믹식초',a:'1큰술'},{n:'소금',a:'약간',p:1}],
+    steps:['토마토와 모짜렐라를 같은 두께로 썬다.','접시에 토마토, 모짜렐라, 바질을 번갈아 놓는다.','올리브유와 발사믹을 뿌린다.','소금을 살짝 뿌려 완성.'] },
+  { id:'sl03', name:'닭가슴살 샐러드', cuisine:'샐러드', cat:'샐러드·가벼운', time:20, level:'쉬움',
+    ing:[{n:'닭가슴살',a:'2조각'},{n:'양상추',a:'1/2통'},{n:'방울토마토',a:'10개'},{n:'파프리카',a:'1/2개'},{n:'올리브유',a:'2큰술',p:1},{n:'발사믹식초',a:'2큰술'},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1}],
+    steps:['닭가슴살에 소금, 후추로 밑간해 굽고 슬라이스한다.','채소를 씻어 먹기 좋게 손질한다.','올리브유, 발사믹으로 드레싱을 만든다.','채소와 닭가슴살을 담고 드레싱을 뿌려 완성.'] },
+];
+
+// ===== 추가 레시피 (DEFAULT_RECIPES 에 합쳐집니다) =====
+const EXTRA_RECIPES = [
+  // ---------- 한식 추가 ----------
+  { id:'kr16', name:'부대찌개', cuisine:'한식', cat:'국·찌개', time:30, level:'보통',
+    ing:[{n:'스팸',a:'1/2캔'},{n:'소시지',a:'4개'},{n:'신김치',a:'1컵'},{n:'두부',a:'1/2모'},{n:'베이크드빈',a:'2큰술'},{n:'대파',a:'1대'},{n:'라면사리',a:'1개'},{n:'고춧가루',a:'2큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'간장',a:'1큰술',p:1}],
+    steps:['냄비에 스팸, 소시지, 김치, 두부를 보기 좋게 둘러 담는다.','고춧가루, 다진마늘, 간장으로 양념을 가운데 올린다.','육수나 물 3컵을 붓고 끓인다.','끓으면 베이크드빈, 라면사리, 대파를 넣고 더 끓여 완성.'] },
+  { id:'kr17', name:'김치전', cuisine:'한식', cat:'분식·간식', time:20, level:'쉬움',
+    ing:[{n:'신김치',a:'2컵'},{n:'부침가루',a:'1컵'},{n:'물',a:'3/4컵'},{n:'대파',a:'1/2대'},{n:'고춧가루',a:'1/2큰술',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['김치를 잘게 썰고 부침가루, 물, 고춧가루와 섞어 반죽한다.','대파를 넣고 농도를 맞춘다.','팬에 기름을 넉넉히 두르고 반죽을 얇게 편다.','앞뒤로 바삭하게 부쳐 완성.'] },
+  { id:'kr18', name:'해물파전', cuisine:'한식', cat:'분식·간식', time:25, level:'보통',
+    ing:[{n:'쪽파',a:'한단'},{n:'오징어',a:'1/2마리'},{n:'새우',a:'6마리'},{n:'홍합살',a:'한줌'},{n:'부침가루',a:'1.5컵'},{n:'계란',a:'1개'},{n:'물',a:'1컵'},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['부침가루에 물을 섞어 반죽하고 손질한 해물을 섞는다.','팬에 기름을 두르고 쪽파를 가지런히 깐다.','반죽을 붓고 해물을 올린 뒤 계란물을 끼얹는다.','앞뒤로 노릇하게 부쳐 완성.'] },
+  { id:'kr19', name:'감자탕', cuisine:'한식', cat:'국·찌개', time:90, level:'어려움',
+    ing:[{n:'돼지등뼈',a:'1kg'},{n:'감자',a:'3개'},{n:'우거지',a:'2줌'},{n:'깻잎',a:'10장'},{n:'대파',a:'2대'},{n:'된장',a:'2큰술',p:1},{n:'고춧가루',a:'3큰술',p:1},{n:'다진마늘',a:'2큰술',p:1},{n:'들깨가루',a:'2큰술'}],
+    steps:['등뼈는 찬물에 2시간 핏물을 빼고 한 번 끓여 헹군다.','된장을 푼 물에 등뼈를 1시간 푹 삶는다.','감자, 우거지, 고춧가루, 마늘을 넣고 더 끓인다.','깻잎, 대파, 들깨가루를 넣고 한소끔 끓여 완성.'] },
+  { id:'kr20', name:'닭볶음탕', cuisine:'한식', cat:'볶음·구이', time:45, level:'보통',
+    ing:[{n:'닭',a:'1마리'},{n:'감자',a:'2개'},{n:'당근',a:'1개'},{n:'양파',a:'1개'},{n:'대파',a:'1대'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'3큰술',p:1},{n:'간장',a:'4큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'2큰술',p:1}],
+    steps:['닭은 토막 내어 끓는 물에 데쳐 기름기를 뺀다.','고추장, 고춧가루, 간장, 설탕, 마늘로 양념을 만든다.','닭과 양념, 물 2컵을 넣고 끓인다.','감자, 당근, 양파를 넣고 졸이다 대파를 넣어 완성.'] },
+  { id:'kr21', name:'육개장', cuisine:'한식', cat:'국·찌개', time:80, level:'어려움',
+    ing:[{n:'소고기 양지',a:'400g'},{n:'대파',a:'3대'},{n:'고사리',a:'2줌'},{n:'숙주',a:'2줌'},{n:'토란대',a:'2줌'},{n:'고춧가루',a:'4큰술',p:1},{n:'다진마늘',a:'2큰술',p:1},{n:'국간장',a:'3큰술',p:1},{n:'참기름',a:'2큰술',p:1}],
+    steps:['양지를 푹 삶아 결대로 찢고 육수는 남긴다.','고춧가루, 참기름, 마늘로 양념을 만들어 고기, 채소에 무친다.','육수에 무친 재료를 넣고 끓인다.','국간장으로 간하고 대파를 듬뿍 넣어 푹 끓인다.'] },
+  { id:'kr22', name:'떡국', cuisine:'한식', cat:'국·찌개', time:20, level:'쉬움',
+    ing:[{n:'떡국떡',a:'2인분'},{n:'소고기',a:'100g'},{n:'계란',a:'2개'},{n:'대파',a:'1대'},{n:'김가루',a:'약간'},{n:'국간장',a:'1.5큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'참기름',a:'약간',p:1}],
+    steps:['떡은 찬물에 30분 불린다.','냄비에 참기름을 두르고 소고기를 볶다 물을 붓는다.','국간장, 마늘로 간하고 떡을 넣어 끓인다.','떡이 떠오르면 계란을 풀어 넣고 대파, 김가루를 올린다.'] },
+  { id:'kr23', name:'만둣국', cuisine:'한식', cat:'국·찌개', time:20, level:'쉬움',
+    ing:[{n:'만두',a:'8개'},{n:'계란',a:'1개'},{n:'대파',a:'1대'},{n:'다진마늘',a:'1/2큰술',p:1},{n:'국간장',a:'1.5큰술',p:1},{n:'참기름',a:'약간',p:1}],
+    steps:['멸치육수나 물 4컵을 끓인다.','국간장, 마늘로 간한다.','만두를 넣고 떠오를 때까지 끓인다.','계란을 풀어 넣고 대파를 올려 완성.'] },
+  { id:'kr24', name:'바지락 칼국수', cuisine:'한식', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'칼국수면',a:'2인분'},{n:'바지락',a:'2줌'},{n:'애호박',a:'1/2개'},{n:'양파',a:'1/2개'},{n:'대파',a:'1대'},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'2큰술',p:1}],
+    steps:['해감한 바지락을 물에 넣고 끓여 육수를 낸다.','채 썬 애호박, 양파를 넣고 국간장, 마늘로 간한다.','면을 넣고 저으며 끓인다.','면이 익으면 대파를 넣어 완성.'] },
+  { id:'kr25', name:'수제비', cuisine:'한식', cat:'밥·면', time:35, level:'보통',
+    ing:[{n:'밀가루',a:'2컵'},{n:'감자',a:'1개'},{n:'애호박',a:'1/2개'},{n:'양파',a:'1/2개'},{n:'대파',a:'1대'},{n:'국간장',a:'2큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['밀가루에 물, 소금을 넣어 반죽해 30분 숙성한다.','멸치육수에 감자, 양파를 넣고 끓인다.','반죽을 얇게 떼어 넣는다.','애호박, 대파를 넣고 국간장, 마늘로 간해 완성.'] },
+  { id:'kr26', name:'비빔밥', cuisine:'한식', cat:'밥·면', time:35, level:'보통',
+    ing:[{n:'밥',a:'2공기'},{n:'소고기',a:'150g'},{n:'시금치',a:'한줌'},{n:'콩나물',a:'한줌'},{n:'당근',a:'1/2개'},{n:'애호박',a:'1/2개'},{n:'계란',a:'2개'},{n:'고추장',a:'2큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['시금치, 콩나물은 데쳐 무치고 당근, 애호박은 볶는다.','소고기는 양념해 볶는다.','그릇에 밥을 담고 나물과 고기를 색 맞춰 올린다.','계란프라이, 고추장, 참기름을 올려 비벼 먹는다.'] },
+  { id:'kr27', name:'낙지볶음', cuisine:'한식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'낙지',a:'3마리'},{n:'양파',a:'1개'},{n:'양배추',a:'1/4통'},{n:'대파',a:'1대'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'2큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['낙지는 밀가루로 주물러 씻어 먹기 좋게 썬다.','고추장, 고춧가루, 간장, 설탕, 마늘로 양념을 만든다.','팬에 채소를 볶다가 낙지와 양념을 넣는다.','센불에서 빠르게 볶아 완성.'] },
+  { id:'kr28', name:'고등어조림', cuisine:'한식', cat:'반찬', time:30, level:'보통',
+    ing:[{n:'고등어',a:'1마리'},{n:'무',a:'1/4개'},{n:'양파',a:'1/2개'},{n:'대파',a:'1대'},{n:'고춧가루',a:'2큰술',p:1},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['무를 도톰하게 썰어 냄비 바닥에 깐다.','고춧가루, 간장, 설탕, 마늘, 물로 양념장을 만든다.','무 위에 고등어를 올리고 양념장을 끼얹는다.','양파, 대파를 올려 국물을 끼얹으며 조린다.'] },
+  { id:'kr29', name:'갈치조림', cuisine:'한식', cat:'반찬', time:30, level:'보통',
+    ing:[{n:'갈치',a:'2토막'},{n:'무',a:'1/3개'},{n:'양파',a:'1/2개'},{n:'대파',a:'1대'},{n:'고춧가루',a:'2큰술',p:1},{n:'간장',a:'3큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'설탕',a:'1/2큰술',p:1}],
+    steps:['무를 깔고 양념장(고춧가루·간장·마늘·설탕·물)을 만든다.','무 위에 갈치를 올리고 양념을 끼얹는다.','중약불로 무가 익을 때까지 조린다.','양파, 대파를 넣고 국물을 끼얹어 완성.'] },
+  { id:'kr30', name:'춘천 닭갈비', cuisine:'한식', cat:'볶음·구이', time:35, level:'보통',
+    ing:[{n:'닭다리살',a:'500g'},{n:'양배추',a:'1/4통'},{n:'고구마',a:'1개'},{n:'떡',a:'한줌'},{n:'대파',a:'1대'},{n:'고추장',a:'3큰술',p:1},{n:'고춧가루',a:'2큰술',p:1},{n:'간장',a:'2큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['닭을 양념(고추장·고춧가루·간장·설탕·마늘)에 30분 재운다.','달군 팬에 닭과 고구마를 먼저 볶는다.','양배추, 떡을 넣고 함께 볶는다.','재료가 익고 양념이 배면 대파를 넣어 완성.'] },
+  { id:'kr31', name:'보쌈', cuisine:'한식', cat:'볶음·구이', time:70, level:'보통',
+    ing:[{n:'통삼겹살',a:'600g'},{n:'된장',a:'2큰술',p:1},{n:'대파',a:'1대'},{n:'생강',a:'1톨'},{n:'마늘',a:'5쪽'},{n:'월계수잎',a:'2장'},{n:'커피',a:'1큰술'},{n:'쌈채소',a:'적당량'}],
+    steps:['물에 된장, 대파, 생강, 마늘, 월계수잎, 커피를 넣고 끓인다.','삼겹살을 넣고 50분 푹 삶는다.','젓가락이 쑥 들어가면 건져 한 김 식힌다.','먹기 좋게 썰어 쌈채소, 김치와 곁들인다.'] },
+  { id:'kr32', name:'삼계탕', cuisine:'한식', cat:'국·찌개', time:80, level:'보통',
+    ing:[{n:'영계',a:'1마리'},{n:'찹쌀',a:'1/2컵'},{n:'수삼',a:'1뿌리'},{n:'대추',a:'4개'},{n:'마늘',a:'6쪽'},{n:'대파',a:'1대'},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1}],
+    steps:['찹쌀은 불리고 닭은 깨끗이 손질한다.','닭 뱃속에 찹쌀, 마늘, 수삼, 대추를 채운다.','냄비에 닭과 물을 넉넉히 붓고 1시간 푹 끓인다.','대파를 넣고 소금, 후추로 간해 먹는다.'] },
+  { id:'kr33', name:'계란찜', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'계란',a:'4개'},{n:'대파',a:'1/3대'},{n:'새우젓',a:'1작은술',p:1},{n:'물',a:'1컵'},{n:'참기름',a:'약간',p:1}],
+    steps:['계란을 풀고 물, 새우젓을 넣어 잘 섞는다.','뚝배기에 부어 약불로 저으며 익힌다.','반쯤 익으면 뚜껑을 덮어 부풀어 오르게 한다.','대파, 참기름을 올려 완성.'] },
+  { id:'kr34', name:'멸치볶음', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'잔멸치',a:'2컵'},{n:'견과류',a:'1/2컵'},{n:'간장',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'올리고당',a:'1큰술',p:1},{n:'식용유',a:'1큰술',p:1}],
+    steps:['마른 팬에 멸치를 살짝 볶아 비린내를 날린다.','기름을 두르고 멸치, 견과류를 볶는다.','간장, 설탕을 넣어 조린다.','불을 끄고 올리고당을 넣어 윤기 나게 버무린다.'] },
+  { id:'kr35', name:'시금치나물', cuisine:'한식', cat:'반찬', time:10, level:'쉬움',
+    ing:[{n:'시금치',a:'1단'},{n:'다진마늘',a:'1/2큰술',p:1},{n:'국간장',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'깨소금',a:'약간',p:1}],
+    steps:['시금치를 끓는 물에 30초 데쳐 찬물에 헹군다.','물기를 꼭 짠다.','국간장, 마늘, 참기름, 깨소금으로 무친다.','조물조물 무쳐 완성.'] },
+  { id:'kr36', name:'무생채', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'무',a:'1/2개'},{n:'고춧가루',a:'2큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['무를 곱게 채 썰어 소금에 살짝 절인다.','물기를 짜고 고춧가루로 먼저 버무려 색을 낸다.','식초, 설탕, 마늘을 넣어 무친다.','간을 보고 깨를 뿌려 완성.'] },
+  { id:'kr37', name:'소고기 장조림', cuisine:'한식', cat:'반찬', time:50, level:'보통',
+    ing:[{n:'소고기 홍두깨살',a:'400g'},{n:'메추리알',a:'15개'},{n:'꽈리고추',a:'한줌'},{n:'간장',a:'1/2컵',p:1},{n:'설탕',a:'2큰술',p:1},{n:'마늘',a:'6쪽'}],
+    steps:['소고기를 삶아 결대로 찢고 육수는 남긴다.','육수에 간장, 설탕, 마늘을 넣고 끓인다.','고기와 삶은 메추리알을 넣어 조린다.','꽈리고추를 넣고 국물이 자작해지면 완성.'] },
+  { id:'kr38', name:'잔치국수', cuisine:'한식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'소면',a:'2인분'},{n:'애호박',a:'1/2개'},{n:'계란',a:'2개'},{n:'김가루',a:'약간'},{n:'대파',a:'1대'},{n:'국간장',a:'2큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1}],
+    steps:['멸치육수를 내어 국간장, 마늘로 간한다.','애호박은 채 썰어 볶고 계란은 지단을 부친다.','소면을 삶아 찬물에 헹군다.','그릇에 면을 담고 육수를 부은 뒤 고명을 올린다.'] },
+  { id:'kr39', name:'콩국수', cuisine:'한식', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'소면',a:'2인분'},{n:'백태',a:'1.5컵'},{n:'오이',a:'1/2개'},{n:'소금',a:'약간',p:1},{n:'깨',a:'2큰술'}],
+    steps:['불린 콩을 삶아 껍질을 벗기고 깨와 함께 곱게 간다.','콩물에 물을 섞어 농도를 맞추고 소금으로 간한다.','소면을 삶아 찬물에 헹군다.','면에 콩물을 붓고 채 썬 오이를 올려 완성.'] },
+  { id:'kr40', name:'동그랑땡', cuisine:'한식', cat:'반찬', time:30, level:'보통',
+    ing:[{n:'다진 돼지고기',a:'300g'},{n:'두부',a:'1/2모'},{n:'당근',a:'1/4개'},{n:'대파',a:'1/2대'},{n:'계란',a:'2개'},{n:'부침가루',a:'1/2컵'},{n:'소금',a:'약간',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['두부는 으깨 물기를 짜고 고기, 다진 채소와 섞는다.','소금으로 간해 반죽하고 동글납작하게 빚는다.','부침가루를 묻히고 계란물을 입힌다.','팬에 기름을 두르고 노릇하게 부쳐 완성.'] },
+
+  // ---------- 중식 추가 ----------
+  { id:'cn06', name:'탕수육', cuisine:'중식', cat:'볶음·구이', time:50, level:'어려움',
+    ing:[{n:'돼지고기 등심',a:'400g'},{n:'양파',a:'1/2개'},{n:'당근',a:'1/3개'},{n:'오이',a:'1/2개'},{n:'전분',a:'1.5컵',p:1},{n:'식초',a:'4큰술',p:1},{n:'설탕',a:'4큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['고기를 길게 썰어 밑간하고 전분물에 버무려 두 번 튀긴다.','물, 설탕, 식초, 간장으로 소스를 끓인다.','채소를 넣고 전분물로 농도를 맞춘다.','튀긴 고기에 소스를 부어 완성(찍먹도 좋다).'] },
+  { id:'cn07', name:'짬뽕', cuisine:'중식', cat:'밥·면', time:35, level:'보통',
+    ing:[{n:'중화면',a:'2인분'},{n:'오징어',a:'1/2마리'},{n:'홍합',a:'한줌'},{n:'새우',a:'6마리'},{n:'양배추',a:'1/4통'},{n:'양파',a:'1개'},{n:'대파',a:'1대'},{n:'고춧가루',a:'3큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'식용유',a:'3큰술',p:1}],
+    steps:['팬에 기름과 고춧가루로 고추기름을 내고 채소를 볶는다.','해물을 넣어 볶고 물을 부어 끓인다.','마늘로 간하고 얼큰하게 끓인다.','삶은 면 위에 부어 완성.'] },
+  { id:'cn08', name:'고추잡채', cuisine:'중식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'돼지고기',a:'200g'},{n:'피망',a:'2개'},{n:'양파',a:'1/2개'},{n:'죽순',a:'1/2컵'},{n:'굴소스',a:'2큰술'},{n:'간장',a:'1큰술',p:1},{n:'전분',a:'1큰술',p:1},{n:'식용유',a:'2큰술',p:1}],
+    steps:['고기를 채 썰어 간장, 전분으로 밑간한다.','채소도 가늘게 채 썬다.','팬에 고기를 볶다 채소를 넣는다.','굴소스로 간하고 센불에 볶아 완성(꽃빵과 곁들임).'] },
+  { id:'cn09', name:'깐쇼새우', cuisine:'중식', cat:'볶음·구이', time:35, level:'어려움',
+    ing:[{n:'새우',a:'15마리'},{n:'양파',a:'1/2개'},{n:'대파',a:'1/2대'},{n:'케첩',a:'4큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'전분',a:'1컵',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['새우는 손질해 밑간하고 전분 입혀 바삭하게 튀긴다.','케첩, 설탕, 식초, 물로 소스를 만든다.','팬에 다진 양파, 대파를 볶고 소스를 끓인다.','튀긴 새우를 넣어 버무려 완성.'] },
+  { id:'cn10', name:'마라탕', cuisine:'중식', cat:'국·찌개', time:30, level:'보통',
+    ing:[{n:'마라탕소스',a:'2큰술'},{n:'청경채',a:'2포기'},{n:'팽이버섯',a:'1봉'},{n:'분모자',a:'한줌'},{n:'소고기',a:'150g'},{n:'두부',a:'1/2모'},{n:'배추',a:'2장'},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['분모자는 미지근한 물에 30분 불린다.','물에 마라탕소스, 마늘을 풀어 끓인다.','단단한 재료(고기·버섯)부터 넣어 익힌다.','채소와 분모자를 넣고 익으면 완성.'] },
+  { id:'cn11', name:'꿔바로우', cuisine:'중식', cat:'볶음·구이', time:45, level:'어려움',
+    ing:[{n:'돼지고기 등심',a:'400g'},{n:'당근',a:'1/3개'},{n:'대파',a:'1/2대'},{n:'감자전분',a:'1.5컵',p:1},{n:'설탕',a:'4큰술',p:1},{n:'식초',a:'4큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['고기를 넓게 썰어 전분 반죽을 입혀 두 번 튀긴다.','설탕, 식초, 간장, 물로 새콤달콤 소스를 끓인다.','채 썬 당근, 대파를 넣는다.','튀긴 고기를 소스에 버무려 완성.'] },
+  { id:'cn12', name:'유린기', cuisine:'중식', cat:'볶음·구이', time:40, level:'보통',
+    ing:[{n:'닭다리살',a:'400g'},{n:'양상추',a:'1/4통'},{n:'대파',a:'1/2대'},{n:'간장',a:'3큰술',p:1},{n:'식초',a:'3큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'전분',a:'1컵',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['닭은 밑간 후 전분 입혀 바삭하게 튀긴다.','간장, 식초, 설탕, 다진 채소로 유린기 소스를 만든다.','접시에 채 썬 양상추를 깐다.','튀긴 닭을 올리고 소스를 끼얹어 완성.'] },
+  { id:'cn13', name:'부추잡채', cuisine:'중식', cat:'볶음·구이', time:20, level:'쉬움',
+    ing:[{n:'부추',a:'1단'},{n:'돼지고기',a:'150g'},{n:'양파',a:'1/2개'},{n:'굴소스',a:'1.5큰술'},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'2큰술',p:1}],
+    steps:['고기를 채 썰어 간장으로 밑간한다.','팬에 고기를 볶다 양파를 넣는다.','부추를 넣고 굴소스로 간한다.','센불에서 빠르게 볶아 완성.'] },
+  { id:'cn14', name:'중화 계란볶음밥', cuisine:'중식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'계란',a:'3개'},{n:'대파',a:'1대'},{n:'굴소스',a:'1큰술'},{n:'간장',a:'1큰술',p:1},{n:'식용유',a:'4큰술',p:1}],
+    steps:['팬에 기름을 넉넉히 두르고 대파로 파기름을 낸다.','계란을 풀어 넣고 밥을 바로 넣어 코팅하듯 볶는다.','굴소스, 간장으로 간한다.','센불에서 고슬고슬하게 볶아 완성.'] },
+  { id:'cn15', name:'동파육', cuisine:'중식', cat:'볶음·구이', time:120, level:'어려움',
+    ing:[{n:'통삼겹살',a:'600g'},{n:'대파',a:'2대'},{n:'생강',a:'1톨'},{n:'간장',a:'5큰술',p:1},{n:'노두유',a:'2큰술'},{n:'설탕',a:'3큰술',p:1},{n:'청주',a:'1/2컵'}],
+    steps:['삼겹살을 통째로 데쳐 네모나게 썬다.','팬에 설탕을 녹여 카라멜을 내고 고기를 굴린다.','간장, 노두유, 청주, 물과 대파·생강을 넣는다.','약불로 1시간 이상 졸여 부드럽게 완성.'] },
+
+  // ---------- 일식 추가 ----------
+  { id:'jp07', name:'가라아게', cuisine:'일식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'닭다리살',a:'400g'},{n:'간장',a:'2큰술',p:1},{n:'청주',a:'1큰술'},{n:'생강',a:'1톨'},{n:'다진마늘',a:'1큰술',p:1},{n:'감자전분',a:'1컵',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['닭을 한입 크기로 썰어 간장, 청주, 생강, 마늘에 20분 재운다.','감자전분을 넉넉히 입힌다.','170도 기름에 한 번 튀긴다.','잠시 식혔다 한 번 더 튀겨 바삭하게 완성.'] },
+  { id:'jp08', name:'유부 우동', cuisine:'일식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'우동면',a:'2인분'},{n:'유부',a:'4장'},{n:'대파',a:'1대'},{n:'계란',a:'2개'},{n:'가쓰오부시',a:'한줌'},{n:'간장',a:'2큰술',p:1},{n:'맛술',a:'2큰술',p:1}],
+    steps:['가쓰오부시로 육수를 내고 간장, 맛술로 간한다.','우동면을 데친다.','그릇에 면을 담고 육수를 붓는다.','유부, 대파, 수란을 올려 완성.'] },
+  { id:'jp09', name:'텐동', cuisine:'일식', cat:'밥·면', time:35, level:'보통',
+    ing:[{n:'새우',a:'6마리'},{n:'고구마',a:'1/2개'},{n:'가지',a:'1개'},{n:'밥',a:'2공기'},{n:'튀김가루',a:'1컵',p:1},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1.5큰술',p:1},{n:'맛술',a:'2큰술',p:1}],
+    steps:['튀김가루에 차가운 물을 섞어 튀김옷을 만든다.','새우와 채소에 옷을 입혀 바삭하게 튀긴다.','간장, 설탕, 맛술을 끓여 덴다레 소스를 만든다.','밥 위에 튀김을 올리고 소스를 뿌려 완성.'] },
+  { id:'jp10', name:'오코노미야키', cuisine:'일식', cat:'분식·간식', time:25, level:'보통',
+    ing:[{n:'양배추',a:'1/4통'},{n:'부침가루',a:'1컵'},{n:'계란',a:'2개'},{n:'베이컨',a:'4줄'},{n:'물',a:'2/3컵'},{n:'돈가스소스',a:'적당량'},{n:'마요네즈',a:'적당량',p:1},{n:'가쓰오부시',a:'한줌'}],
+    steps:['잘게 썬 양배추, 부침가루, 계란, 물을 섞어 반죽한다.','팬에 반죽을 둥글게 펴고 베이컨을 올린다.','앞뒤로 노릇하게 굽는다.','소스, 마요네즈, 가쓰오부시를 뿌려 완성.'] },
+  { id:'jp11', name:'부타동', cuisine:'일식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'돼지고기 목살',a:'300g'},{n:'양파',a:'1개'},{n:'밥',a:'2공기'},{n:'쪽파',a:'약간'},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1.5큰술',p:1},{n:'맛술',a:'2큰술',p:1}],
+    steps:['간장, 설탕, 맛술, 물로 소스를 만든다.','팬에 양파를 볶다 돼지고기를 넣는다.','소스를 부어 졸이듯 익힌다.','밥에 올리고 쪽파를 뿌려 완성.'] },
+  { id:'jp12', name:'니쿠자가', cuisine:'일식', cat:'반찬', time:35, level:'쉬움',
+    ing:[{n:'소고기',a:'200g'},{n:'감자',a:'3개'},{n:'양파',a:'1개'},{n:'당근',a:'1개'},{n:'간장',a:'4큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'맛술',a:'2큰술',p:1}],
+    steps:['감자, 당근, 양파를 큼직하게 썬다.','팬에 소고기를 볶다 채소를 넣는다.','물, 간장, 설탕, 맛술을 넣고 끓인다.','국물이 자작해질 때까지 졸여 완성.'] },
+  { id:'jp13', name:'차완무시', cuisine:'일식', cat:'반찬', time:25, level:'보통',
+    ing:[{n:'계란',a:'3개'},{n:'새우',a:'4마리'},{n:'표고버섯',a:'2개'},{n:'은행',a:'6알'},{n:'가쓰오육수',a:'1.5컵'},{n:'맛술',a:'1큰술',p:1},{n:'간장',a:'1작은술',p:1}],
+    steps:['계란을 풀고 식힌 육수, 맛술, 간장을 섞어 체에 거른다.','그릇에 새우, 버섯, 은행을 담는다.','계란물을 부어 채운다.','약불 찜기에 15분 부드럽게 쪄 완성.'] },
+  { id:'jp14', name:'카츠산도', cuisine:'일식', cat:'분식·간식', time:30, level:'보통',
+    ing:[{n:'돈가스',a:'2장'},{n:'식빵',a:'4장'},{n:'양배추',a:'2장'},{n:'돈가스소스',a:'3큰술'},{n:'머스타드',a:'약간',p:1},{n:'버터',a:'약간'}],
+    steps:['돈가스를 바삭하게 튀겨 소스를 바른다.','식빵 안쪽에 버터, 머스타드를 바른다.','채 썬 양배추와 돈가스를 올려 샌드한다.','테두리를 잘라 먹기 좋게 자른다.'] },
+  { id:'jp15', name:'야키토리', cuisine:'일식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'닭다리살',a:'400g'},{n:'대파',a:'2대'},{n:'간장',a:'4큰술',p:1},{n:'맛술',a:'3큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'청주',a:'1큰술'}],
+    steps:['닭과 대파를 번갈아 꼬치에 꿴다.','간장, 맛술, 설탕, 청주를 졸여 타레 소스를 만든다.','팬이나 그릴에 꼬치를 굽는다.','소스를 발라가며 윤기 나게 구워 완성.'] },
+  { id:'jp16', name:'타코야키', cuisine:'일식', cat:'분식·간식', time:30, level:'보통',
+    ing:[{n:'문어',a:'150g'},{n:'타코야키가루',a:'1.5컵'},{n:'계란',a:'2개'},{n:'대파',a:'1대'},{n:'물',a:'2컵'},{n:'타코야키소스',a:'적당량'},{n:'마요네즈',a:'적당량',p:1},{n:'가쓰오부시',a:'한줌'}],
+    steps:['가루, 계란, 물을 섞어 묽은 반죽을 만든다.','달군 타코야키 팬에 반죽을 붓고 문어, 대파를 넣는다.','꼬치로 돌려가며 동그랗게 굽는다.','소스, 마요네즈, 가쓰오부시를 뿌려 완성.'] },
+  { id:'jp17', name:'규스지 조림', cuisine:'일식', cat:'반찬', time:90, level:'보통',
+    ing:[{n:'소힘줄',a:'500g'},{n:'무',a:'1/3개'},{n:'곤약',a:'1모'},{n:'대파',a:'1대'},{n:'간장',a:'5큰술',p:1},{n:'맛술',a:'3큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'생강',a:'1톨'}],
+    steps:['소힘줄을 데쳐 헹구고 한입 크기로 썬다.','무, 곤약을 썰어 넣고 물을 부어 끓인다.','간장, 맛술, 설탕, 생강을 넣는다.','약불로 1시간 이상 푹 졸여 완성.'] },
+  { id:'jp18', name:'새우튀김 (에비후라이)', cuisine:'일식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'새우',a:'10마리'},{n:'밀가루',a:'1/2컵',p:1},{n:'계란',a:'2개'},{n:'빵가루',a:'1.5컵'},{n:'타르타르소스',a:'적당량'},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['새우는 꼬리만 남기고 손질해 곧게 편다.','밀가루, 계란물, 빵가루 순으로 옷을 입힌다.','170도 기름에 노릇하게 튀긴다.','타르타르소스를 곁들여 완성.'] },
+
+  // ---------- 양식 추가 ----------
+  { id:'we09', name:'라자냐', cuisine:'양식', cat:'밥·면', time:60, level:'어려움',
+    ing:[{n:'라자냐면',a:'8장'},{n:'다진 소고기',a:'300g'},{n:'토마토소스',a:'2컵'},{n:'양파',a:'1개'},{n:'모짜렐라치즈',a:'2컵'},{n:'베샤멜소스',a:'2컵'},{n:'마늘',a:'3쪽'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['양파, 마늘, 고기를 볶고 토마토소스를 넣어 미트소스를 만든다.','면을 삶거나 그대로 사용한다.','그릇에 면-미트소스-베샤멜-치즈 순으로 층층이 쌓는다.','180도 오븐에 25분 구워 완성.'] },
+  { id:'we10', name:'봉골레 파스타', cuisine:'양식', cat:'밥·면', time:25, level:'보통',
+    ing:[{n:'스파게티면',a:'200g'},{n:'바지락',a:'2줌'},{n:'마늘',a:'5쪽'},{n:'페페론치노',a:'3개'},{n:'화이트와인',a:'1/4컵'},{n:'올리브유',a:'4큰술',p:1},{n:'파슬리',a:'약간'}],
+    steps:['면을 소금물에 알덴테로 삶는다.','팬에 올리브유, 마늘, 페페론치노를 볶는다.','해감한 바지락과 와인을 넣어 입이 벌어질 때까지 끓인다.','면과 면수를 넣어 유화시키고 파슬리를 뿌린다.'] },
+  { id:'we11', name:'명란 파스타', cuisine:'양식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'스파게티면',a:'200g'},{n:'명란젓',a:'3큰술'},{n:'버터',a:'2큰술'},{n:'생크림',a:'1/2컵'},{n:'마늘',a:'2쪽'},{n:'김가루',a:'약간'},{n:'올리브유',a:'1큰술',p:1}],
+    steps:['면을 삶고 면수를 남긴다.','팬에 버터, 마늘을 볶고 명란을 으깨 넣는다.','생크림과 면수를 넣어 소스를 만든다.','면을 넣어 버무리고 김가루를 뿌려 완성.'] },
+  { id:'we12', name:'로제 파스타', cuisine:'양식', cat:'밥·면', time:25, level:'쉬움',
+    ing:[{n:'펜네면',a:'200g'},{n:'토마토소스',a:'1컵'},{n:'생크림',a:'1컵'},{n:'베이컨',a:'4줄'},{n:'양파',a:'1/2개'},{n:'마늘',a:'3쪽'},{n:'파르메산치즈',a:'1/2컵'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['면을 삶는다.','팬에 마늘, 양파, 베이컨을 볶는다.','토마토소스와 생크림을 1:1로 넣고 끓인다.','면과 치즈를 넣어 버무려 완성.'] },
+  { id:'we13', name:'미트볼', cuisine:'양식', cat:'볶음·구이', time:40, level:'보통',
+    ing:[{n:'다진 소고기',a:'300g'},{n:'다진 돼지고기',a:'150g'},{n:'양파',a:'1/2개'},{n:'빵가루',a:'1/2컵'},{n:'계란',a:'1개'},{n:'토마토소스',a:'2컵'},{n:'파르메산치즈',a:'1/2컵'},{n:'마늘',a:'3쪽'}],
+    steps:['고기, 다진 양파, 빵가루, 계란, 치즈를 섞어 동글게 빚는다.','팬에 겉면을 노릇하게 굽는다.','토마토소스, 마늘을 넣고 끓인다.','미트볼이 속까지 익을 때까지 졸여 완성.'] },
+  { id:'we14', name:'라따뚜이', cuisine:'양식', cat:'반찬', time:50, level:'보통',
+    ing:[{n:'가지',a:'1개'},{n:'애호박',a:'1개'},{n:'토마토',a:'2개'},{n:'파프리카',a:'1개'},{n:'양파',a:'1개'},{n:'토마토소스',a:'1.5컵'},{n:'마늘',a:'3쪽'},{n:'올리브유',a:'3큰술',p:1}],
+    steps:['채소를 얇게 슬라이스한다.','팬에 양파, 마늘, 토마토소스를 깐다.','채소를 색 맞춰 동그랗게 돌려 담는다.','올리브유를 두르고 180도 오븐에 40분 구워 완성.'] },
+  { id:'we15', name:'비프 스튜', cuisine:'양식', cat:'국·찌개', time:90, level:'보통',
+    ing:[{n:'소고기 부챗살',a:'500g'},{n:'감자',a:'2개'},{n:'당근',a:'1개'},{n:'양파',a:'1개'},{n:'토마토페이스트',a:'2큰술'},{n:'레드와인',a:'1컵'},{n:'밀가루',a:'2큰술',p:1},{n:'버터',a:'2큰술'}],
+    steps:['고기에 밀가루를 입혀 겉면을 시어링한다.','양파를 볶고 토마토페이스트, 와인을 넣어 졸인다.','물과 고기를 넣고 1시간 끓인다.','감자, 당근을 넣고 부드러워질 때까지 졸여 완성.'] },
+  { id:'we16', name:'클램 차우더', cuisine:'양식', cat:'국·찌개', time:35, level:'보통',
+    ing:[{n:'바지락',a:'2줌'},{n:'감자',a:'2개'},{n:'양파',a:'1개'},{n:'베이컨',a:'3줄'},{n:'우유',a:'2컵'},{n:'생크림',a:'1컵'},{n:'밀가루',a:'2큰술',p:1},{n:'버터',a:'2큰술'}],
+    steps:['바지락을 삶아 살을 발라내고 육수는 남긴다.','베이컨, 양파를 볶고 버터, 밀가루로 루를 만든다.','우유, 생크림, 육수를 넣어 끓인다.','감자, 바지락살을 넣고 걸쭉하게 끓여 완성.'] },
+  { id:'we17', name:'시저 샐러드', cuisine:'양식', cat:'샐러드·가벼운', time:15, level:'쉬움',
+    ing:[{n:'로메인',a:'1통'},{n:'닭가슴살',a:'1조각'},{n:'크루통',a:'1컵'},{n:'파르메산치즈',a:'1/2컵'},{n:'마요네즈',a:'3큰술',p:1},{n:'레몬즙',a:'1큰술'},{n:'다진마늘',a:'1/2큰술',p:1}],
+    steps:['마요네즈, 레몬즙, 마늘, 치즈로 드레싱을 만든다.','닭가슴살을 구워 슬라이스한다.','로메인을 한입 크기로 뜯는다.','채소에 드레싱을 버무리고 닭, 크루통, 치즈를 올린다.'] },
+  { id:'we18', name:'프렌치 토스트', cuisine:'양식', cat:'분식·간식', time:15, level:'쉬움',
+    ing:[{n:'식빵',a:'4장'},{n:'계란',a:'2개'},{n:'우유',a:'1/2컵'},{n:'설탕',a:'1큰술',p:1},{n:'버터',a:'2큰술'},{n:'메이플시럽',a:'적당량'}],
+    steps:['계란, 우유, 설탕을 섞어 계란물을 만든다.','식빵을 계란물에 충분히 적신다.','버터를 녹인 팬에 약불로 노릇하게 굽는다.','메이플시럽을 뿌려 완성.'] },
+  { id:'we19', name:'에그 베네딕트', cuisine:'양식', cat:'분식·간식', time:30, level:'어려움',
+    ing:[{n:'잉글리시머핀',a:'2개'},{n:'계란',a:'4개'},{n:'베이컨',a:'4줄'},{n:'버터',a:'100g'},{n:'계란노른자',a:'2개'},{n:'레몬즙',a:'1큰술'},{n:'식초',a:'1큰술',p:1}],
+    steps:['식초 넣은 물에 계란을 넣어 수란을 만든다.','노른자, 녹인 버터, 레몬즙으로 홀랜다이즈 소스를 만든다.','머핀을 굽고 베이컨을 굽는다.','머핀-베이컨-수란 순으로 올리고 소스를 끼얹는다.'] },
+  { id:'we20', name:'필라프', cuisine:'양식', cat:'밥·면', time:25, level:'쉬움',
+    ing:[{n:'쌀',a:'1.5컵'},{n:'양파',a:'1/2개'},{n:'당근',a:'1/3개'},{n:'파프리카',a:'1/2개'},{n:'새우',a:'8마리'},{n:'버터',a:'2큰술'},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1}],
+    steps:['버터에 양파, 채소, 새우를 볶는다.','씻은 쌀을 넣어 함께 볶는다.','물을 쌀 높이만큼 붓고 소금, 후추로 간한다.','뚜껑을 덮어 약불로 익혀 뜸 들여 완성.'] },
+
+  // ---------- 동남아 추가 ----------
+  { id:'sa05', name:'가파오라이스', cuisine:'동남아', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'다진 닭고기',a:'250g'},{n:'바질',a:'한줌'},{n:'양파',a:'1/2개'},{n:'파프리카',a:'1/2개'},{n:'계란',a:'2개'},{n:'밥',a:'2공기'},{n:'굴소스',a:'1.5큰술'},{n:'피쉬소스',a:'1큰술'},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['팬에 마늘, 양파를 볶고 다진 닭고기를 넣는다.','굴소스, 피쉬소스로 간한다.','바질, 파프리카를 넣고 살짝 볶는다.','밥에 올리고 계란프라이를 얹어 완성.'] },
+  { id:'sa06', name:'베트남 쌀국수 (포)', cuisine:'동남아', cat:'밥·면', time:60, level:'보통',
+    ing:[{n:'쌀국수면',a:'2인분'},{n:'소고기 양지',a:'300g'},{n:'양파',a:'1개'},{n:'생강',a:'1톨'},{n:'숙주',a:'2줌'},{n:'고수',a:'약간'},{n:'피쉬소스',a:'2큰술'},{n:'팔각',a:'2개'}],
+    steps:['구운 양파, 생강, 팔각과 양지를 물에 넣어 육수를 낸다.','피쉬소스로 간하고 고기는 건져 얇게 썬다.','쌀국수를 데쳐 그릇에 담는다.','뜨거운 육수를 붓고 고기, 숙주, 고수를 올린다.'] },
+  { id:'sa07', name:'반미', cuisine:'동남아', cat:'분식·간식', time:25, level:'쉬움',
+    ing:[{n:'바게트',a:'2개'},{n:'돼지고기 목살',a:'250g'},{n:'당근',a:'1/2개'},{n:'무',a:'1/4개'},{n:'오이',a:'1/2개'},{n:'고수',a:'약간'},{n:'마요네즈',a:'적당량',p:1},{n:'피쉬소스',a:'1큰술'},{n:'식초',a:'2큰술',p:1}],
+    steps:['당근, 무를 채 썰어 식초, 설탕에 절인다.','고기를 피쉬소스에 재워 굽는다.','바게트를 갈라 마요네즈를 바른다.','고기, 절임채소, 오이, 고수를 넣어 완성.'] },
+  { id:'sa08', name:'그린 커리', cuisine:'동남아', cat:'국·찌개', time:30, level:'보통',
+    ing:[{n:'닭고기',a:'300g'},{n:'가지',a:'1개'},{n:'파프리카',a:'1개'},{n:'그린커리페이스트',a:'2큰술'},{n:'코코넛밀크',a:'1캔'},{n:'바질',a:'한줌'},{n:'피쉬소스',a:'1.5큰술'},{n:'설탕',a:'1큰술',p:1}],
+    steps:['팬에 코코넛밀크 일부와 커리페이스트를 볶아 향을 낸다.','닭고기를 넣어 익힌다.','남은 코코넛밀크, 채소를 넣고 끓인다.','피쉬소스, 설탕으로 간하고 바질을 넣어 완성.'] },
+  { id:'sa09', name:'미고렝', cuisine:'동남아', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'중화면',a:'2인분'},{n:'새우',a:'8마리'},{n:'양배추',a:'1/4통'},{n:'계란',a:'2개'},{n:'대파',a:'1대'},{n:'굴소스',a:'1.5큰술'},{n:'간장',a:'1큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1}],
+    steps:['면을 삶아 둔다.','팬에 새우, 채소를 볶고 계란을 넣는다.','면을 넣고 굴소스, 간장, 고춧가루로 간한다.','센불에서 볶아 완성.'] },
+  { id:'sa10', name:'월남쌈', cuisine:'동남아', cat:'샐러드·가벼운', time:25, level:'쉬움',
+    ing:[{n:'라이스페이퍼',a:'10장'},{n:'새우',a:'10마리'},{n:'당근',a:'1/2개'},{n:'오이',a:'1/2개'},{n:'파프리카',a:'1/2개'},{n:'상추',a:'적당량'},{n:'땅콩소스',a:'적당량'}],
+    steps:['새우는 삶아 반으로 가른다.','채소를 가늘게 채 썬다.','라이스페이퍼를 미지근한 물에 적신다.','채소와 새우를 올려 말고 땅콩소스에 찍어 먹는다.'] },
+
+  // ---------- 분식 추가 ----------
+  { id:'sn05', name:'쫄면', cuisine:'분식', cat:'분식·간식', time:15, level:'쉬움',
+    ing:[{n:'쫄면',a:'2인분'},{n:'양배추',a:'2장'},{n:'오이',a:'1/2개'},{n:'당근',a:'1/4개'},{n:'계란',a:'2개'},{n:'고추장',a:'2큰술',p:1},{n:'식초',a:'1.5큰술',p:1},{n:'설탕',a:'1큰술',p:1}],
+    steps:['고추장, 식초, 설탕으로 양념장을 만든다.','쫄면을 삶아 찬물에 헹군다.','채소를 가늘게 채 썬다.','면에 양념장과 채소를 넣어 비비고 삶은 계란을 올린다.'] },
+  { id:'sn06', name:'참치김밥', cuisine:'분식', cat:'분식·간식', time:25, level:'보통',
+    ing:[{n:'밥',a:'3공기'},{n:'김',a:'4장'},{n:'참치캔',a:'1캔'},{n:'단무지',a:'4줄'},{n:'당근',a:'1개'},{n:'계란',a:'3개'},{n:'마요네즈',a:'2큰술',p:1},{n:'참기름',a:'2큰술',p:1}],
+    steps:['참치는 기름을 빼고 마요네즈와 버무린다.','밥에 참기름, 소금으로 밑간한다.','김 위에 밥을 펴고 참치, 단무지, 당근, 지단을 올린다.','단단히 말아 참기름을 바르고 썬다.'] },
+  { id:'sn07', name:'치즈 떡볶이', cuisine:'분식', cat:'분식·간식', time:20, level:'쉬움',
+    ing:[{n:'떡볶이떡',a:'400g'},{n:'어묵',a:'3장'},{n:'모짜렐라치즈',a:'1컵'},{n:'대파',a:'1대'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'설탕',a:'2큰술',p:1}],
+    steps:['물에 고추장, 고춧가루, 설탕을 풀어 끓인다.','떡과 어묵을 넣고 졸인다.','떡이 말랑해지면 대파를 넣는다.','치즈를 듬뿍 올려 녹여 완성.'] },
+  { id:'sn08', name:'핫도그', cuisine:'분식', cat:'분식·간식', time:25, level:'보통',
+    ing:[{n:'소시지',a:'4개'},{n:'핫도그가루',a:'1.5컵'},{n:'계란',a:'1개'},{n:'우유',a:'1/2컵'},{n:'빵가루',a:'1컵'},{n:'케첩',a:'적당량',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['핫도그가루에 계란, 우유를 섞어 반죽한다.','소시지를 꼬치에 꽂아 반죽을 입힌다.','빵가루를 묻힌다.','170도 기름에 노릇하게 튀겨 케첩을 뿌린다.'] },
+  { id:'sn09', name:'길거리 토스트', cuisine:'분식', cat:'분식·간식', time:15, level:'쉬움',
+    ing:[{n:'식빵',a:'4장'},{n:'양배추',a:'2장'},{n:'당근',a:'1/4개'},{n:'계란',a:'3개'},{n:'슬라이스치즈',a:'2장'},{n:'설탕',a:'1큰술',p:1},{n:'케첩',a:'적당량',p:1},{n:'버터',a:'2큰술'}],
+    steps:['채 썬 양배추, 당근, 계란을 섞어 부친다.','버터 두른 팬에 식빵을 굽는다.','식빵에 야채계란전, 치즈를 올린다.','설탕, 케첩을 뿌리고 식빵으로 덮어 완성.'] },
+  { id:'sn10', name:'군만두', cuisine:'분식', cat:'분식·간식', time:20, level:'쉬움',
+    ing:[{n:'냉동만두',a:'10개'},{n:'식용유',a:'2큰술',p:1},{n:'물',a:'1/4컵'},{n:'간장',a:'2큰술',p:1},{n:'식초',a:'1큰술',p:1}],
+    steps:['팬에 기름을 두르고 만두를 한 면씩 굽는다.','바닥이 노릇해지면 물을 붓고 뚜껑을 덮는다.','물이 증발하면 뚜껑을 열어 바닥을 바삭하게 굽는다.','간장, 식초를 섞은 소스를 곁들여 완성.'] },
+
+  // ---------- 샐러드·가벼운 추가 ----------
+  { id:'sl04', name:'그릭 샐러드', cuisine:'샐러드', cat:'샐러드·가벼운', time:10, level:'쉬움',
+    ing:[{n:'오이',a:'1개'},{n:'토마토',a:'2개'},{n:'적양파',a:'1/2개'},{n:'페타치즈',a:'100g'},{n:'올리브',a:'한줌'},{n:'올리브유',a:'3큰술',p:1},{n:'레몬즙',a:'1큰술'},{n:'소금',a:'약간',p:1}],
+    steps:['오이, 토마토, 적양파를 큼직하게 썬다.','볼에 채소와 올리브를 담는다.','올리브유, 레몬즙, 소금으로 드레싱을 뿌린다.','페타치즈를 큼직하게 올려 완성.'] },
+  { id:'sl05', name:'콥 샐러드', cuisine:'샐러드', cat:'샐러드·가벼운', time:20, level:'쉬움',
+    ing:[{n:'양상추',a:'1/2통'},{n:'닭가슴살',a:'1조각'},{n:'베이컨',a:'3줄'},{n:'삶은계란',a:'2개'},{n:'아보카도',a:'1개'},{n:'방울토마토',a:'10개'},{n:'블루치즈드레싱',a:'적당량'}],
+    steps:['닭가슴살을 구워 깍둑썰기하고 베이컨은 바삭하게 굽는다.','계란, 아보카도, 토마토를 썬다.','접시에 양상추를 깔고 재료를 줄 맞춰 올린다.','드레싱을 뿌려 완성.'] },
+  { id:'sl06', name:'두부 샐러드', cuisine:'샐러드', cat:'샐러드·가벼운', time:15, level:'쉬움',
+    ing:[{n:'두부',a:'1모'},{n:'양상추',a:'1/4통'},{n:'방울토마토',a:'8개'},{n:'간장',a:'2큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'올리브유',a:'2큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1}],
+    steps:['두부를 노릇하게 구워 깍둑썰기한다.','간장, 식초, 올리브유, 마늘로 드레싱을 만든다.','채소를 그릇에 담고 두부를 올린다.','드레싱을 뿌려 완성.'] },
+  { id:'sl07', name:'단호박 샐러드', cuisine:'샐러드', cat:'샐러드·가벼운', time:25, level:'쉬움',
+    ing:[{n:'단호박',a:'1/2개'},{n:'건포도',a:'2큰술'},{n:'견과류',a:'1/4컵'},{n:'마요네즈',a:'3큰술',p:1},{n:'플레인요거트',a:'2큰술'},{n:'소금',a:'약간',p:1}],
+    steps:['단호박을 쪄서 한 김 식히고 으깬다.','마요네즈, 요거트, 소금을 넣어 섞는다.','건포도와 견과류를 넣는다.','고루 버무려 완성.'] },
+
+  // ---------- 인도·중동 (신규) ----------
+  { id:'in01', name:'버터 치킨', cuisine:'인도·중동', cat:'볶음·구이', time:45, level:'보통',
+    ing:[{n:'닭다리살',a:'400g'},{n:'토마토',a:'3개'},{n:'양파',a:'1개'},{n:'생크림',a:'1컵'},{n:'버터',a:'3큰술'},{n:'플레인요거트',a:'1/2컵'},{n:'커리가루',a:'2큰술'},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['닭을 요거트, 커리가루에 30분 재운다.','버터에 양파, 마늘을 볶고 토마토를 넣어 끓인다.','곱게 갈아 소스를 만들고 닭을 넣어 익힌다.','생크림과 버터를 넣어 부드럽게 마무리한다.'] },
+  { id:'in02', name:'탄두리 치킨', cuisine:'인도·중동', cat:'볶음·구이', time:50, level:'보통',
+    ing:[{n:'닭다리',a:'4개'},{n:'플레인요거트',a:'1컵'},{n:'커리가루',a:'2큰술'},{n:'파프리카가루',a:'1큰술'},{n:'레몬즙',a:'2큰술'},{n:'다진마늘',a:'1큰술',p:1},{n:'생강',a:'1톨'}],
+    steps:['요거트, 커리가루, 파프리카가루, 레몬즙, 마늘, 생강을 섞는다.','닭에 칼집을 내고 양념에 1시간 이상 재운다.','200도 오븐에 35분 굽는다.','겉이 노릇하게 익으면 완성.'] },
+  { id:'in03', name:'달 커리 (렌틸콩)', cuisine:'인도·중동', cat:'국·찌개', time:35, level:'쉬움',
+    ing:[{n:'렌틸콩',a:'1컵'},{n:'양파',a:'1개'},{n:'토마토',a:'2개'},{n:'커리가루',a:'1.5큰술'},{n:'코코넛밀크',a:'1/2컵'},{n:'다진마늘',a:'1큰술',p:1},{n:'생강',a:'1톨'},{n:'버터',a:'2큰술'}],
+    steps:['렌틸콩을 씻어 물에 삶기 시작한다.','버터에 양파, 마늘, 생강을 볶고 토마토를 넣는다.','커리가루를 넣어 볶고 삶은 콩에 넣는다.','코코넛밀크를 넣고 걸쭉하게 끓여 완성.'] },
+  { id:'in04', name:'치킨 비리야니', cuisine:'인도·중동', cat:'밥·면', time:60, level:'어려움',
+    ing:[{n:'바스마티쌀',a:'2컵'},{n:'닭다리살',a:'400g'},{n:'양파',a:'2개'},{n:'플레인요거트',a:'1/2컵'},{n:'커리가루',a:'2큰술'},{n:'사프란',a:'약간'},{n:'다진마늘',a:'1큰술',p:1},{n:'버터',a:'3큰술'}],
+    steps:['닭을 요거트, 커리가루, 마늘에 재운다.','양파를 갈색이 나게 볶고 닭을 넣어 익힌다.','쌀을 70% 삶아 닭 위에 층층이 올린다.','사프란물을 뿌리고 뚜껑을 덮어 약불로 뜸 들여 완성.'] },
+  { id:'in05', name:'후무스', cuisine:'인도·중동', cat:'샐러드·가벼운', time:15, level:'쉬움',
+    ing:[{n:'병아리콩',a:'2컵'},{n:'타히니',a:'3큰술'},{n:'레몬즙',a:'2큰술'},{n:'올리브유',a:'3큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['삶은 병아리콩, 타히니, 레몬즙, 마늘을 믹서에 넣는다.','올리브유와 물을 조금씩 넣으며 곱게 간다.','소금으로 간을 맞춘다.','접시에 담고 올리브유를 둘러 빵·채소와 곁들인다.'] },
+  { id:'in06', name:'샥슈카', cuisine:'인도·중동', cat:'볶음·구이', time:30, level:'쉬움',
+    ing:[{n:'계란',a:'4개'},{n:'토마토',a:'4개'},{n:'양파',a:'1개'},{n:'파프리카',a:'1개'},{n:'토마토소스',a:'1컵'},{n:'다진마늘',a:'1큰술',p:1},{n:'파프리카가루',a:'1큰술'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['올리브유에 양파, 마늘, 파프리카를 볶는다.','토마토와 토마토소스, 파프리카가루를 넣어 끓인다.','소스에 홈을 만들어 계란을 깨 넣는다.','뚜껑을 덮어 흰자가 익을 때까지 익혀 완성.'] },
+
+  // ---------- 멕시칸 (신규) ----------
+  { id:'mx01', name:'타코', cuisine:'멕시칸', cat:'분식·간식', time:30, level:'보통',
+    ing:[{n:'또띠야',a:'6장'},{n:'다진 소고기',a:'300g'},{n:'양파',a:'1/2개'},{n:'토마토',a:'1개'},{n:'양상추',a:'1/4통'},{n:'체다치즈',a:'1컵'},{n:'타코시즈닝',a:'2큰술'},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['고기를 마늘, 양파와 볶고 타코시즈닝으로 간한다.','토마토, 양상추를 잘게 썬다.','또띠야를 살짝 데운다.','또띠야에 고기, 채소, 치즈를 올려 싸 먹는다.'] },
+  { id:'mx02', name:'부리토', cuisine:'멕시칸', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'또띠야',a:'4장'},{n:'닭고기',a:'300g'},{n:'밥',a:'2공기'},{n:'강낭콩',a:'1컵'},{n:'체다치즈',a:'1컵'},{n:'양상추',a:'1/4통'},{n:'살사소스',a:'적당량'},{n:'타코시즈닝',a:'2큰술'}],
+    steps:['닭고기를 타코시즈닝으로 볶는다.','또띠야에 밥, 콩, 닭고기를 올린다.','치즈, 양상추, 살사를 더한다.','단단히 말아 팬에 겉면을 살짝 구워 완성.'] },
+  { id:'mx03', name:'케사디야', cuisine:'멕시칸', cat:'분식·간식', time:15, level:'쉬움',
+    ing:[{n:'또띠야',a:'4장'},{n:'체다치즈',a:'1.5컵'},{n:'닭고기',a:'150g'},{n:'파프리카',a:'1/2개'},{n:'양파',a:'1/2개'},{n:'살사소스',a:'적당량'}],
+    steps:['닭고기와 채소를 볶는다.','또띠야 반쪽에 치즈, 볶은 재료를 올린다.','반으로 접어 팬에 굽는다.','치즈가 녹고 겉이 바삭하면 썰어 살사와 곁들인다.'] },
+  { id:'mx04', name:'과카몰리', cuisine:'멕시칸', cat:'샐러드·가벼운', time:10, level:'쉬움',
+    ing:[{n:'아보카도',a:'2개'},{n:'토마토',a:'1개'},{n:'적양파',a:'1/4개'},{n:'고수',a:'약간'},{n:'레몬즙',a:'1.5큰술'},{n:'소금',a:'약간',p:1}],
+    steps:['잘 익은 아보카도를 으깬다.','잘게 썬 토마토, 적양파, 고수를 넣는다.','레몬즙, 소금으로 간한다.','나초나 빵과 곁들여 완성.'] },
+  { id:'mx05', name:'화이타', cuisine:'멕시칸', cat:'볶음·구이', time:25, level:'쉬움',
+    ing:[{n:'소고기',a:'300g'},{n:'파프리카',a:'2개'},{n:'양파',a:'1개'},{n:'또띠야',a:'6장'},{n:'타코시즈닝',a:'2큰술'},{n:'다진마늘',a:'1큰술',p:1},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['소고기와 채소를 길게 썬다.','팬에 기름을 두르고 센불에 고기를 볶는다.','파프리카, 양파, 타코시즈닝을 넣어 볶는다.','데운 또띠야에 싸 먹는다.'] },
+];
+
+// ===== 추가 레시피 2차 (한·중·일·양 집중) =====
+const EXTRA_RECIPES2 = [
+  // ---------- 한식 +30 ----------
+  { id:'kr41', name:'청국장찌개', cuisine:'한식', cat:'국·찌개', time:25, level:'쉬움',
+    ing:[{n:'청국장',a:'1팩'},{n:'두부',a:'1/2모'},{n:'신김치',a:'1컵'},{n:'애호박',a:'1/3개'},{n:'양파',a:'1/2개'},{n:'대파',a:'1대'},{n:'고춧가루',a:'1큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1}],
+    steps:['멸치육수에 김치, 애호박, 양파를 넣고 끓인다.','청국장을 풀고 고춧가루, 마늘을 넣는다.','두부를 넣고 보글보글 끓인다.','대파를 올려 한소끔 끓여 완성.'] },
+  { id:'kr42', name:'소고기 무국', cuisine:'한식', cat:'국·찌개', time:35, level:'쉬움',
+    ing:[{n:'소고기 양지',a:'200g'},{n:'무',a:'1/3개'},{n:'대파',a:'1대'},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'2큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['냄비에 참기름을 두르고 소고기와 나박썬 무를 볶는다.','물 5컵을 붓고 센불로 끓인다.','국간장, 다진마늘로 간한다.','무가 투명해질 때까지 끓이고 대파를 넣어 완성.'] },
+  { id:'kr43', name:'북엇국', cuisine:'한식', cat:'국·찌개', time:25, level:'쉬움',
+    ing:[{n:'북어채',a:'2컵'},{n:'계란',a:'2개'},{n:'무',a:'1/4개'},{n:'대파',a:'1대'},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'새우젓',a:'1작은술',p:1}],
+    steps:['북어채를 물에 불려 참기름에 볶는다.','물과 나박썬 무를 넣고 끓인다.','국간장, 새우젓, 마늘로 간한다.','계란을 풀어 넣고 대파를 올려 완성.'] },
+  { id:'kr44', name:'떡만둣국', cuisine:'한식', cat:'국·찌개', time:20, level:'쉬움',
+    ing:[{n:'떡국떡',a:'2인분'},{n:'만두',a:'6개'},{n:'계란',a:'2개'},{n:'대파',a:'1대'},{n:'김가루',a:'약간'},{n:'국간장',a:'1.5큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1}],
+    steps:['육수를 끓여 국간장, 마늘로 간한다.','불린 떡과 만두를 넣고 끓인다.','떡과 만두가 떠오르면 계란을 풀어 넣는다.','대파, 김가루를 올려 완성.'] },
+  { id:'kr45', name:'동태찌개', cuisine:'한식', cat:'국·찌개', time:30, level:'보통',
+    ing:[{n:'동태',a:'1마리'},{n:'무',a:'1/4개'},{n:'두부',a:'1/2모'},{n:'콩나물',a:'한줌'},{n:'대파',a:'1대'},{n:'고춧가루',a:'2큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'1큰술',p:1}],
+    steps:['냄비에 나박썬 무를 깔고 물을 부어 끓인다.','고춧가루, 마늘, 국간장으로 양념한다.','동태를 넣고 끓이다 두부, 콩나물을 넣는다.','대파를 올려 시원하게 끓여 완성.'] },
+  { id:'kr46', name:'갈비탕', cuisine:'한식', cat:'국·찌개', time:120, level:'보통',
+    ing:[{n:'소갈비',a:'800g'},{n:'무',a:'1/3개'},{n:'대파',a:'2대'},{n:'당면',a:'한줌'},{n:'다진마늘',a:'1큰술',p:1},{n:'국간장',a:'2큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['갈비를 찬물에 1시간 핏물 빼고 데쳐 헹군다.','물을 넉넉히 붓고 무, 대파와 1시간 푹 끓인다.','갈비가 부드러워지면 국간장, 마늘로 간한다.','삶은 당면을 넣고 소금으로 마무리한다.'] },
+  { id:'kr47', name:'설렁탕', cuisine:'한식', cat:'국·찌개', time:180, level:'어려움',
+    ing:[{n:'사골',a:'1kg'},{n:'양지머리',a:'400g'},{n:'소면',a:'2인분'},{n:'대파',a:'2대'},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1}],
+    steps:['사골을 찬물에 담가 핏물을 빼고 한 번 끓여 버린다.','물을 새로 붓고 양지와 함께 2~3시간 푹 고운다.','뽀얗게 우러나면 고기는 건져 썬다.','그릇에 소면, 고기를 담고 국물을 부어 대파·소금으로 낸다.'] },
+  { id:'kr48', name:'김치만두', cuisine:'한식', cat:'분식·간식', time:50, level:'보통',
+    ing:[{n:'만두피',a:'25장'},{n:'신김치',a:'1.5컵'},{n:'두부',a:'1/2모'},{n:'다진 돼지고기',a:'200g'},{n:'부추',a:'한줌'},{n:'다진마늘',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['김치는 물기를 짜 다지고 두부는 으깨 물기를 뺀다.','고기, 김치, 두부, 부추에 마늘, 참기름, 소금을 넣어 소를 만든다.','만두피에 소를 넣고 빚는다.','찜기에 10분 찌거나 굽거나 국에 넣어 익힌다.'] },
+  { id:'kr49', name:'두부김치', cuisine:'한식', cat:'볶음·구이', time:20, level:'쉬움',
+    ing:[{n:'두부',a:'1모'},{n:'신김치',a:'2컵'},{n:'돼지고기',a:'150g'},{n:'양파',a:'1/2개'},{n:'대파',a:'1대'},{n:'고춧가루',a:'1큰술',p:1},{n:'설탕',a:'1/2큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['두부는 도톰하게 썰어 데치거나 굽는다.','팬에 돼지고기를 볶다 김치, 양파를 넣는다.','고춧가루, 설탕으로 간하고 참기름을 두른다.','접시에 두부를 두르고 볶은 김치를 가운데 담아 완성.'] },
+  { id:'kr50', name:'돼지갈비', cuisine:'한식', cat:'볶음·구이', time:60, level:'보통',
+    ing:[{n:'돼지갈비',a:'800g'},{n:'양파',a:'1개'},{n:'대파',a:'1대'},{n:'배',a:'1/2개'},{n:'간장',a:'5큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'다진마늘',a:'1.5큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['갈비는 찬물에 1시간 핏물을 뺀다.','간장, 설탕, 마늘, 갈은 배, 참기름으로 양념을 만든다.','갈비를 양념에 2시간 이상 재운다.','팬이나 그릴에 양파, 대파와 함께 구워 완성.'] },
+  { id:'kr51', name:'닭강정', cuisine:'한식', cat:'볶음·구이', time:45, level:'보통',
+    ing:[{n:'닭다리살',a:'500g'},{n:'견과류',a:'1/4컵'},{n:'전분',a:'1컵',p:1},{n:'고추장',a:'1.5큰술',p:1},{n:'케첩',a:'3큰술',p:1},{n:'물엿',a:'3큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['닭을 한입 크기로 썰어 밑간 후 전분 입혀 두 번 튀긴다.','고추장, 케첩, 물엿, 간장, 마늘로 소스를 끓인다.','튀긴 닭을 넣어 빠르게 버무린다.','견과류를 뿌려 완성.'] },
+  { id:'kr52', name:'닭불고기', cuisine:'한식', cat:'볶음·구이', time:30, level:'쉬움',
+    ing:[{n:'닭다리살',a:'500g'},{n:'양파',a:'1개'},{n:'당근',a:'1/3개'},{n:'대파',a:'1대'},{n:'고추장',a:'1.5큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'간장',a:'2큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['닭을 양념(고추장·고춧가루·간장·설탕·마늘)에 30분 재운다.','팬에 닭을 볶다 양파, 당근을 넣는다.','양념이 배도록 졸이듯 볶는다.','대파를 넣어 마무리한다.'] },
+  { id:'kr53', name:'코다리조림', cuisine:'한식', cat:'반찬', time:35, level:'보통',
+    ing:[{n:'코다리',a:'2마리'},{n:'무',a:'1/4개'},{n:'콩나물',a:'한줌'},{n:'대파',a:'1대'},{n:'고춧가루',a:'2큰술',p:1},{n:'간장',a:'3큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['코다리는 토막 내고 무는 도톰하게 썬다.','고춧가루, 간장, 설탕, 마늘, 물로 양념장을 만든다.','무를 깔고 코다리를 올려 양념을 끼얹어 조린다.','콩나물, 대파를 올려 국물을 끼얹으며 완성.'] },
+  { id:'kr54', name:'골뱅이무침', cuisine:'한식', cat:'반찬', time:20, level:'쉬움',
+    ing:[{n:'골뱅이캔',a:'1캔'},{n:'오이',a:'1개'},{n:'양파',a:'1/2개'},{n:'당근',a:'1/4개'},{n:'소면',a:'1인분'},{n:'고추장',a:'2큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'식초',a:'2큰술',p:1},{n:'설탕',a:'1큰술',p:1}],
+    steps:['골뱅이는 건져 큼직하게 썬다.','채소를 채 썰고 고추장, 고춧가루, 식초, 설탕으로 양념을 만든다.','골뱅이와 채소를 양념에 무친다.','삶은 소면을 곁들여 완성.'] },
+  { id:'kr55', name:'오이무침', cuisine:'한식', cat:'반찬', time:10, level:'쉬움',
+    ing:[{n:'오이',a:'2개'},{n:'고춧가루',a:'1큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'설탕',a:'1/2큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['오이를 어슷하게 썰어 소금에 살짝 절인다.','물기를 가볍게 짠다.','고춧가루, 식초, 설탕, 마늘로 무친다.','깨를 뿌려 완성.'] },
+  { id:'kr56', name:'가지볶음', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'가지',a:'2개'},{n:'대파',a:'1/2대'},{n:'간장',a:'1.5큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'식용유',a:'1큰술',p:1}],
+    steps:['가지를 길게 썰어 소금물에 살짝 절였다 물기를 짠다.','팬에 기름을 두르고 가지를 볶는다.','간장, 마늘로 간한다.','대파, 참기름을 넣어 마무리한다.'] },
+  { id:'kr57', name:'애호박볶음', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'애호박',a:'2개'},{n:'대파',a:'1/2대'},{n:'새우젓',a:'1큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1},{n:'식용유',a:'1큰술',p:1},{n:'참기름',a:'약간',p:1}],
+    steps:['애호박을 반달 모양으로 썬다.','팬에 기름을 두르고 애호박을 볶는다.','새우젓, 마늘로 간한다.','대파, 참기름을 넣어 마무리한다.'] },
+  { id:'kr58', name:'깻잎무침', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'깻잎',a:'30장'},{n:'대파',a:'1/3대'},{n:'간장',a:'3큰술',p:1},{n:'고춧가루',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['간장, 고춧가루, 다진 대파, 마늘, 참기름으로 양념장을 만든다.','깻잎을 한 장씩 펴 양념장을 조금씩 바른다.','켜켜이 쌓는다.','잠시 두어 간이 배면 완성.'] },
+  { id:'kr59', name:'미역줄기볶음', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'미역줄기',a:'300g'},{n:'양파',a:'1/2개'},{n:'다진마늘',a:'1큰술',p:1},{n:'식용유',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1},{n:'깨',a:'약간',p:1}],
+    steps:['미역줄기는 물에 담가 짠기를 빼고 헹군다.','팬에 기름을 두르고 마늘, 양파를 볶는다.','미역줄기를 넣고 볶는다.','참기름, 깨를 넣어 마무리한다.'] },
+  { id:'kr60', name:'진미채볶음', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'진미채',a:'200g'},{n:'고추장',a:'1.5큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1},{n:'물엿',a:'2큰술',p:1},{n:'마요네즈',a:'1큰술',p:1},{n:'다진마늘',a:'1/2큰술',p:1}],
+    steps:['진미채를 가볍게 찢어 둔다.','팬에 고추장, 고춧가루, 물엿, 마늘, 물을 넣어 약불로 끓인다.','불을 끄고 진미채를 넣어 버무린다.','마요네즈를 넣어 부드럽게 마무리한다.'] },
+  { id:'kr61', name:'콩나물무침', cuisine:'한식', cat:'반찬', time:15, level:'쉬움',
+    ing:[{n:'콩나물',a:'300g'},{n:'대파',a:'1/3대'},{n:'다진마늘',a:'1/2큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1},{n:'소금',a:'약간',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['콩나물을 끓는 물에 5분 삶아 헹군다.','물기를 가볍게 뺀다.','소금, 마늘, 고춧가루, 대파, 참기름으로 무친다.','깨를 뿌려 완성.'] },
+  { id:'kr62', name:'고사리나물', cuisine:'한식', cat:'반찬', time:20, level:'쉬움',
+    ing:[{n:'삶은 고사리',a:'300g'},{n:'대파',a:'1/3대'},{n:'국간장',a:'1.5큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'들기름',a:'1큰술',p:1},{n:'깨',a:'약간',p:1}],
+    steps:['삶은 고사리를 먹기 좋게 썬다.','국간장, 마늘로 밑간한다.','팬에 들기름을 두르고 볶다 물을 약간 넣어 익힌다.','대파, 깨를 넣어 마무리한다.'] },
+  { id:'kr63', name:'애호박전', cuisine:'한식', cat:'반찬', time:20, level:'쉬움',
+    ing:[{n:'애호박',a:'2개'},{n:'계란',a:'2개'},{n:'부침가루',a:'1/2컵',p:1},{n:'소금',a:'약간',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['애호박을 동그랗게 썰어 소금을 살짝 뿌린다.','부침가루를 묻히고 계란물을 입힌다.','팬에 기름을 두르고 약불로 부친다.','앞뒤로 노릇하게 익혀 완성.'] },
+  { id:'kr64', name:'부추전', cuisine:'한식', cat:'분식·간식', time:20, level:'쉬움',
+    ing:[{n:'부추',a:'1단'},{n:'부침가루',a:'1컵',p:1},{n:'물',a:'3/4컵'},{n:'청양고추',a:'1개'},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['부추를 5cm 길이로 썰고 청양고추는 송송 썬다.','부침가루에 물을 섞어 반죽한다.','부추와 고추를 넣어 섞는다.','팬에 기름을 두르고 얇게 부쳐 완성.'] },
+  { id:'kr65', name:'간장계란밥', cuisine:'한식', cat:'밥·면', time:10, level:'쉬움',
+    ing:[{n:'밥',a:'1공기'},{n:'계란',a:'2개'},{n:'버터',a:'1큰술'},{n:'김가루',a:'약간'},{n:'간장',a:'1큰술',p:1},{n:'참기름',a:'1작은술',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['계란프라이를 반숙으로 부친다.','따뜻한 밥에 버터를 올려 녹인다.','간장, 참기름을 두르고 비빈다.','계란프라이, 김가루를 올려 완성.'] },
+  { id:'kr66', name:'참치마요덮밥', cuisine:'한식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'참치캔',a:'1캔'},{n:'계란',a:'2개'},{n:'양파',a:'1/4개'},{n:'마요네즈',a:'2큰술',p:1},{n:'간장',a:'1큰술',p:1},{n:'김가루',a:'약간'}],
+    steps:['참치는 기름을 빼고 다진 양파, 마요네즈와 섞는다.','계란프라이를 부친다.','밥 위에 참치마요를 올린다.','계란, 김가루를 올리고 간장을 살짝 둘러 완성.'] },
+  { id:'kr67', name:'닭개장', cuisine:'한식', cat:'국·찌개', time:60, level:'보통',
+    ing:[{n:'닭',a:'1/2마리'},{n:'대파',a:'2대'},{n:'숙주',a:'2줌'},{n:'고사리',a:'한줌'},{n:'토란대',a:'한줌'},{n:'고춧가루',a:'3큰술',p:1},{n:'다진마늘',a:'1.5큰술',p:1},{n:'국간장',a:'2큰술',p:1}],
+    steps:['닭을 삶아 살을 발라 찢고 육수는 남긴다.','고춧가루, 마늘로 양념을 만들어 채소에 무친다.','육수에 무친 채소와 닭살을 넣고 끓인다.','국간장으로 간하고 대파를 듬뿍 넣어 완성.'] },
+  { id:'kr68', name:'우거지된장국', cuisine:'한식', cat:'국·찌개', time:30, level:'쉬움',
+    ing:[{n:'우거지',a:'2줌'},{n:'된장',a:'2큰술',p:1},{n:'대파',a:'1대'},{n:'다진마늘',a:'1큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1}],
+    steps:['삶은 우거지를 먹기 좋게 썰어 된장에 무친다.','멸치육수에 우거지를 넣고 끓인다.','마늘, 고춧가루를 넣어 간을 맞춘다.','대파를 넣고 푹 끓여 완성.'] },
+  { id:'kr69', name:'열무 비빔국수', cuisine:'한식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'소면',a:'2인분'},{n:'열무김치',a:'1.5컵'},{n:'고추장',a:'1.5큰술',p:1},{n:'고춧가루',a:'1/2큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'참기름',a:'1큰술',p:1}],
+    steps:['고추장, 고춧가루, 식초, 설탕, 참기름으로 양념장을 만든다.','소면을 삶아 찬물에 헹군다.','면에 양념장과 열무김치를 넣어 비빈다.','김칫국물을 약간 더해 완성.'] },
+  { id:'kr70', name:'김치말이국수', cuisine:'한식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'소면',a:'2인분'},{n:'신김치',a:'1컵'},{n:'김칫국물',a:'1컵'},{n:'오이',a:'1/2개'},{n:'설탕',a:'1큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'김가루',a:'약간'}],
+    steps:['김치를 잘게 썰고 김칫국물에 물, 설탕, 식초를 섞어 육수를 만든다.','소면을 삶아 찬물에 헹군다.','그릇에 면을 담고 차가운 김치육수를 붓는다.','김치, 채 썬 오이, 김가루를 올려 완성.'] },
+
+  // ---------- 중식 +12 ----------
+  { id:'cn16', name:'잡채밥', cuisine:'중식', cat:'밥·면', time:25, level:'보통',
+    ing:[{n:'밥',a:'2공기'},{n:'돼지고기',a:'150g'},{n:'양파',a:'1개'},{n:'피망',a:'1개'},{n:'양배추',a:'1/4통'},{n:'목이버섯',a:'한줌'},{n:'굴소스',a:'2큰술'},{n:'간장',a:'1큰술',p:1},{n:'전분물',a:'약간',p:1}],
+    steps:['고기와 채소를 채 썬다.','팬에 고기를 볶다 채소를 넣는다.','물, 굴소스, 간장을 넣고 끓인다.','전분물로 농도를 맞춰 밥 위에 올려 완성.'] },
+  { id:'cn17', name:'양장피', cuisine:'중식', cat:'볶음·구이', time:40, level:'어려움',
+    ing:[{n:'양장피',a:'100g'},{n:'새우',a:'8마리'},{n:'오이',a:'1개'},{n:'양배추',a:'1/4통'},{n:'당근',a:'1/2개'},{n:'계란',a:'2개'},{n:'겨자',a:'1큰술'},{n:'식초',a:'3큰술',p:1},{n:'설탕',a:'2큰술',p:1}],
+    steps:['양장피를 데쳐 찬물에 헹구고 기름에 무친다.','채소를 곱게 채 썰고 계란은 지단을 부친다.','새우는 삶아 둔다.','접시에 색 맞춰 돌려 담고 겨자·식초·설탕 소스를 곁들여 완성.'] },
+  { id:'cn18', name:'라조기', cuisine:'중식', cat:'볶음·구이', time:40, level:'어려움',
+    ing:[{n:'닭다리살',a:'400g'},{n:'죽순',a:'1/2컵'},{n:'양송이버섯',a:'4개'},{n:'청경채',a:'2포기'},{n:'마른고추',a:'4개'},{n:'간장',a:'2큰술',p:1},{n:'굴소스',a:'1큰술'},{n:'전분',a:'1컵',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['닭을 밑간해 전분 입혀 바삭하게 튀긴다.','팬에 마른고추를 볶아 매운향을 낸다.','죽순, 버섯, 청경채를 볶고 간장, 굴소스로 간한다.','튀긴 닭을 넣고 전분물로 농도를 맞춰 완성.'] },
+  { id:'cn19', name:'칠리새우', cuisine:'중식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'새우',a:'15마리'},{n:'양파',a:'1/2개'},{n:'대파',a:'1/2대'},{n:'케첩',a:'4큰술',p:1},{n:'두반장',a:'1큰술'},{n:'설탕',a:'1.5큰술',p:1},{n:'전분',a:'1컵',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['새우는 손질해 밑간 후 전분 입혀 튀긴다.','팬에 마늘, 양파를 볶고 두반장을 넣는다.','케첩, 설탕, 물로 칠리소스를 끓인다.','튀긴 새우를 넣어 버무리고 대파를 올려 완성.'] },
+  { id:'cn20', name:'멘보샤', cuisine:'중식', cat:'분식·간식', time:30, level:'보통',
+    ing:[{n:'식빵',a:'4장'},{n:'새우',a:'200g'},{n:'계란',a:'1개'},{n:'전분',a:'1큰술',p:1},{n:'소금',a:'약간',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['새우를 곱게 다져 계란, 전분, 소금으로 반죽한다.','식빵 사이에 새우소를 펴 바른다.','테두리를 잘라 네 조각으로 자른다.','170도 기름에 노릇하게 튀겨 완성.'] },
+  { id:'cn21', name:'마라샹궈', cuisine:'중식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'소고기',a:'200g'},{n:'청경채',a:'2포기'},{n:'팽이버섯',a:'1봉'},{n:'감자',a:'1개'},{n:'연근',a:'한줌'},{n:'마라소스',a:'3큰술'},{n:'건고추',a:'5개'},{n:'다진마늘',a:'1큰술',p:1},{n:'식용유',a:'3큰술',p:1}],
+    steps:['단단한 채소(감자·연근)는 살짝 데친다.','팬에 기름, 건고추, 마늘을 볶아 향을 낸다.','고기와 채소를 넣어 볶는다.','마라소스를 넣고 센불에 볶아 완성.'] },
+  { id:'cn22', name:'회과육', cuisine:'중식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'삼겹살',a:'300g'},{n:'양배추',a:'1/4통'},{n:'대파',a:'1대'},{n:'피망',a:'1개'},{n:'두반장',a:'1.5큰술'},{n:'춘장',a:'1큰술'},{n:'설탕',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['삼겹살을 통으로 삶아 식힌 뒤 얇게 썬다.','팬에 고기를 볶아 기름을 낸다.','두반장, 춘장, 마늘을 넣어 볶는다.','양배추, 피망, 대파를 넣고 설탕으로 간해 볶아 완성.'] },
+  { id:'cn23', name:'어향가지', cuisine:'중식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'가지',a:'2개'},{n:'다진 돼지고기',a:'100g'},{n:'대파',a:'1/2대'},{n:'두반장',a:'1큰술'},{n:'간장',a:'1큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'식초',a:'1큰술',p:1},{n:'다진마늘',a:'1큰술',p:1},{n:'전분물',a:'약간',p:1}],
+    steps:['가지를 길게 썰어 기름에 튀기듯 볶아 건진다.','팬에 고기, 마늘, 두반장을 볶는다.','간장, 설탕, 식초, 물로 소스를 끓인다.','가지를 넣고 전분물로 농도를 맞춰 대파를 올려 완성.'] },
+  { id:'cn24', name:'류산슬', cuisine:'중식', cat:'볶음·구이', time:35, level:'어려움',
+    ing:[{n:'새우',a:'8마리'},{n:'관자',a:'4개'},{n:'죽순',a:'1/2컵'},{n:'표고버섯',a:'4개'},{n:'청경채',a:'2포기'},{n:'굴소스',a:'2큰술'},{n:'간장',a:'1큰술',p:1},{n:'전분물',a:'약간',p:1},{n:'식용유',a:'2큰술',p:1}],
+    steps:['해물과 채소를 한입 크기로 썬다.','팬에 기름을 두르고 해물을 살짝 볶아 덜어둔다.','채소를 볶고 물, 굴소스, 간장을 넣는다.','해물을 다시 넣고 전분물로 농도를 맞춰 완성.'] },
+  { id:'cn25', name:'새우완자탕', cuisine:'중식', cat:'국·찌개', time:30, level:'보통',
+    ing:[{n:'새우',a:'200g'},{n:'두부',a:'1/4모'},{n:'계란',a:'1개'},{n:'청경채',a:'2포기'},{n:'대파',a:'1/2대'},{n:'전분',a:'1큰술',p:1},{n:'소금',a:'약간',p:1},{n:'굴소스',a:'1큰술'}],
+    steps:['새우를 다져 으깬 두부, 계란, 전분, 소금과 섞어 완자 반죽을 만든다.','육수를 끓여 굴소스로 간한다.','완자를 한 숟갈씩 떠 넣어 익힌다.','청경채, 대파를 넣고 한소끔 끓여 완성.'] },
+  { id:'cn26', name:'짜장밥', cuisine:'중식', cat:'밥·면', time:30, level:'보통',
+    ing:[{n:'밥',a:'2공기'},{n:'돼지고기',a:'150g'},{n:'양파',a:'2개'},{n:'감자',a:'1개'},{n:'애호박',a:'1/2개'},{n:'춘장',a:'3큰술'},{n:'설탕',a:'1큰술',p:1},{n:'전분물',a:'약간',p:1},{n:'식용유',a:'4큰술',p:1}],
+    steps:['춘장을 기름에 볶아 잡내를 날린다.','고기와 채소를 깍둑썰어 볶는다.','볶은 춘장, 설탕, 물을 넣고 끓인다.','전분물로 농도를 맞춰 밥 위에 올려 완성.'] },
+  { id:'cn27', name:'울면', cuisine:'중식', cat:'밥·면', time:25, level:'보통',
+    ing:[{n:'중화면',a:'2인분'},{n:'오징어',a:'1/2마리'},{n:'새우',a:'6마리'},{n:'배추',a:'2장'},{n:'양파',a:'1/2개'},{n:'계란',a:'2개'},{n:'굴소스',a:'1큰술'},{n:'간장',a:'1큰술',p:1},{n:'전분물',a:'넉넉히',p:1}],
+    steps:['육수에 해물, 채소를 넣고 끓인다.','굴소스, 간장으로 간한다.','전분물을 넉넉히 풀어 걸쭉하게 만든다.','계란을 풀어 넣고 삶은 면 위에 부어 완성.'] },
+
+  // ---------- 일식 +12 ----------
+  { id:'jp19', name:'돈코츠 라멘', cuisine:'일식', cat:'밥·면', time:40, level:'보통',
+    ing:[{n:'라멘면',a:'2인분'},{n:'차슈',a:'4장'},{n:'반숙란',a:'2개'},{n:'숙주',a:'2줌'},{n:'쪽파',a:'약간'},{n:'돈코츠육수',a:'4컵'},{n:'간장',a:'2큰술',p:1},{n:'다진마늘',a:'1큰술',p:1}],
+    steps:['돈코츠육수를 데우고 간장, 마늘로 간한다.','라멘면을 삶는다.','그릇에 면을 담고 육수를 붓는다.','차슈, 반숙란, 숙주, 쪽파를 올려 완성.'] },
+  { id:'jp20', name:'미소 라멘', cuisine:'일식', cat:'밥·면', time:35, level:'보통',
+    ing:[{n:'라멘면',a:'2인분'},{n:'돼지고기',a:'150g'},{n:'숙주',a:'2줌'},{n:'옥수수',a:'1/2컵'},{n:'대파',a:'1대'},{n:'미소된장',a:'3큰술'},{n:'다진마늘',a:'1큰술',p:1},{n:'버터',a:'1큰술'}],
+    steps:['팬에 고기, 마늘을 볶고 미소된장을 넣어 볶는다.','물을 부어 육수를 만든다.','라멘면을 삶아 그릇에 담고 육수를 붓는다.','숙주, 옥수수, 대파, 버터를 올려 완성.'] },
+  { id:'jp21', name:'자루소바', cuisine:'일식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'메밀면',a:'2인분'},{n:'쯔유',a:'1컵'},{n:'무',a:'1/4개'},{n:'쪽파',a:'약간'},{n:'김가루',a:'약간'},{n:'와사비',a:'약간'}],
+    steps:['메밀면을 삶아 찬물에 박박 헹궈 물기를 뺀다.','쯔유에 물을 섞어 차갑게 만든다.','무는 강판에 갈고 쪽파는 송송 썬다.','면을 김가루와 함께 담고 쯔유에 무즙·와사비를 풀어 찍어 먹는다.'] },
+  { id:'jp22', name:'치킨난반', cuisine:'일식', cat:'볶음·구이', time:35, level:'보통',
+    ing:[{n:'닭다리살',a:'400g'},{n:'계란',a:'3개'},{n:'밀가루',a:'1/2컵',p:1},{n:'간장',a:'2큰술',p:1},{n:'식초',a:'3큰술',p:1},{n:'설탕',a:'2큰술',p:1},{n:'타르타르소스',a:'적당량'},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['닭에 밀가루, 계란물을 입혀 노릇하게 튀긴다.','간장, 식초, 설탕을 끓여 난반소스를 만든다.','튀긴 닭을 소스에 담갔다 건진다.','타르타르소스를 곁들여 완성.'] },
+  { id:'jp23', name:'멘치카츠', cuisine:'일식', cat:'볶음·구이', time:35, level:'보통',
+    ing:[{n:'다진 소고기',a:'200g'},{n:'다진 돼지고기',a:'150g'},{n:'양파',a:'1개'},{n:'빵가루',a:'1.5컵'},{n:'계란',a:'2개'},{n:'밀가루',a:'1/2컵',p:1},{n:'소금',a:'약간',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['볶아 식힌 양파와 고기, 소금을 섞어 반죽한다.','동글납작하게 빚는다.','밀가루, 계란물, 빵가루 순으로 옷을 입힌다.','170도 기름에 속까지 튀겨 완성.'] },
+  { id:'jp24', name:'고등어 미소조림', cuisine:'일식', cat:'반찬', time:25, level:'쉬움',
+    ing:[{n:'고등어',a:'1마리'},{n:'대파',a:'1대'},{n:'생강',a:'1톨'},{n:'미소된장',a:'2큰술'},{n:'청주',a:'2큰술'},{n:'설탕',a:'1.5큰술',p:1},{n:'맛술',a:'2큰술',p:1}],
+    steps:['고등어는 손질해 칼집을 넣는다.','물, 청주, 설탕, 맛술, 생강을 끓인다.','미소된장을 풀고 고등어를 넣어 조린다.','국물을 끼얹으며 졸이고 대파를 올려 완성.'] },
+  { id:'jp25', name:'방어 데리야키', cuisine:'일식', cat:'볶음·구이', time:20, level:'쉬움',
+    ing:[{n:'방어',a:'2토막'},{n:'간장',a:'3큰술',p:1},{n:'맛술',a:'2큰술',p:1},{n:'설탕',a:'1큰술',p:1},{n:'청주',a:'1큰술'},{n:'식용유',a:'약간',p:1}],
+    steps:['방어에 소금을 뿌려 잠시 두었다 물기를 닦는다.','팬에 기름을 두르고 방어를 노릇하게 굽는다.','간장, 맛술, 설탕, 청주를 넣어 졸인다.','소스가 윤기 나게 끼얹어 완성.'] },
+  { id:'jp26', name:'카레 우동', cuisine:'일식', cat:'밥·면', time:25, level:'쉬움',
+    ing:[{n:'우동면',a:'2인분'},{n:'돼지고기',a:'150g'},{n:'양파',a:'1개'},{n:'대파',a:'1대'},{n:'카레가루',a:'2큰술'},{n:'가쓰오육수',a:'4컵'},{n:'간장',a:'1큰술',p:1},{n:'전분물',a:'약간',p:1}],
+    steps:['육수에 고기, 양파를 넣고 끓인다.','카레가루를 풀고 간장으로 간한다.','전분물로 살짝 걸쭉하게 만든다.','데친 우동면 위에 부어 대파를 올려 완성.'] },
+  { id:'jp27', name:'모둠 텐푸라', cuisine:'일식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'새우',a:'6마리'},{n:'단호박',a:'1/4개'},{n:'가지',a:'1개'},{n:'깻잎',a:'4장'},{n:'튀김가루',a:'1.5컵',p:1},{n:'쯔유',a:'1/2컵'},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['튀김가루에 차가운 물을 가볍게 섞어 튀김옷을 만든다.','새우와 채소에 옷을 얇게 입힌다.','170도 기름에 바삭하게 튀긴다.','쯔유에 무즙을 곁들여 찍어 먹는다.'] },
+  { id:'jp28', name:'참치마요 오니기리', cuisine:'일식', cat:'밥·면', time:15, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'참치캔',a:'1캔'},{n:'김',a:'2장'},{n:'마요네즈',a:'2큰술',p:1},{n:'소금',a:'약간',p:1},{n:'참기름',a:'약간',p:1}],
+    steps:['참치는 기름을 빼고 마요네즈와 섞는다.','따뜻한 밥에 소금, 참기름으로 밑간한다.','밥 안에 참치마요를 넣어 삼각형으로 뭉친다.','김으로 감싸 완성.'] },
+  { id:'jp29', name:'다시마키 타마고', cuisine:'일식', cat:'반찬', time:15, level:'보통',
+    ing:[{n:'계란',a:'4개'},{n:'가쓰오육수',a:'4큰술'},{n:'맛술',a:'1큰술',p:1},{n:'간장',a:'1작은술',p:1},{n:'설탕',a:'1작은술',p:1},{n:'식용유',a:'약간',p:1}],
+    steps:['계란에 육수, 맛술, 간장, 설탕을 넣어 곱게 푼다.','사각팬을 약불로 달궈 기름을 얇게 두른다.','계란물을 얇게 부어가며 여러 번 말아준다.','촉촉하게 말아 한 김 식혀 썰어 완성.'] },
+  { id:'jp30', name:'연어 오차즈케', cuisine:'일식', cat:'밥·면', time:10, level:'쉬움',
+    ing:[{n:'밥',a:'2공기'},{n:'구운 연어',a:'150g'},{n:'녹차',a:'2컵'},{n:'김가루',a:'약간'},{n:'쪽파',a:'약간'},{n:'와사비',a:'약간'},{n:'소금',a:'약간',p:1}],
+    steps:['구운 연어를 잘게 부순다.','그릇에 밥을 담고 연어, 김가루, 쪽파를 올린다.','뜨거운 녹차(또는 육수)를 붓는다.','와사비를 살짝 곁들여 말아 먹는다.'] },
+
+  // ---------- 양식 +16 ----------
+  { id:'we21', name:'볼로네제 스파게티', cuisine:'양식', cat:'밥·면', time:40, level:'보통',
+    ing:[{n:'스파게티면',a:'200g'},{n:'다진 소고기',a:'300g'},{n:'양파',a:'1개'},{n:'당근',a:'1/2개'},{n:'셀러리',a:'1대'},{n:'토마토소스',a:'2컵'},{n:'마늘',a:'3쪽'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['양파, 당근, 셀러리, 마늘을 잘게 다져 볶는다.','다진 고기를 넣어 노릇하게 볶는다.','토마토소스를 넣고 약불로 20분 졸인다.','삶은 면에 소스를 올려 완성.'] },
+  { id:'we22', name:'바질 페스토 파스타', cuisine:'양식', cat:'밥·면', time:20, level:'쉬움',
+    ing:[{n:'스파게티면',a:'200g'},{n:'바질페스토',a:'4큰술'},{n:'방울토마토',a:'8개'},{n:'마늘',a:'2쪽'},{n:'파르메산치즈',a:'1/2컵'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['면을 삶고 면수를 남긴다.','팬에 올리브유, 마늘, 방울토마토를 볶는다.','불을 끄고 페스토와 면, 면수를 넣어 버무린다.','파르메산치즈를 뿌려 완성.'] },
+  { id:'we23', name:'새우 로제 파스타', cuisine:'양식', cat:'밥·면', time:25, level:'쉬움',
+    ing:[{n:'펜네면',a:'200g'},{n:'새우',a:'10마리'},{n:'토마토소스',a:'1컵'},{n:'생크림',a:'1컵'},{n:'양파',a:'1/2개'},{n:'마늘',a:'3쪽'},{n:'파르메산치즈',a:'1/2컵'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['면을 삶는다.','팬에 마늘, 양파, 새우를 볶는다.','토마토소스와 생크림을 넣고 끓인다.','면과 치즈를 넣어 버무려 완성.'] },
+  { id:'we24', name:'안심 스테이크', cuisine:'양식', cat:'볶음·구이', time:25, level:'보통',
+    ing:[{n:'소안심',a:'2덩이'},{n:'마늘',a:'4쪽'},{n:'로즈마리',a:'2줄기'},{n:'버터',a:'2큰술'},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1},{n:'올리브유',a:'1큰술',p:1}],
+    steps:['고기를 실온에 두고 소금, 후추로 밑간한다.','센불 팬에 올리브유를 두르고 겉면을 시어링한다.','버터, 마늘, 로즈마리를 넣어 향을 입히며 끼얹는다.','원하는 굽기로 익혀 5분 레스팅 후 완성.'] },
+  { id:'we25', name:'폭찹', cuisine:'양식', cat:'볶음·구이', time:25, level:'쉬움',
+    ing:[{n:'돼지등심',a:'2덩이'},{n:'마늘',a:'4쪽'},{n:'로즈마리',a:'1줄기'},{n:'버터',a:'2큰술'},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1},{n:'올리브유',a:'1큰술',p:1}],
+    steps:['돼지등심에 소금, 후추로 밑간한다.','팬에 올리브유를 두르고 양면을 노릇하게 굽는다.','버터, 마늘, 로즈마리를 넣어 끼얹는다.','속까지 익으면 레스팅 후 완성.'] },
+  { id:'we26', name:'치킨 파마산', cuisine:'양식', cat:'볶음·구이', time:35, level:'보통',
+    ing:[{n:'닭가슴살',a:'2조각'},{n:'빵가루',a:'1컵'},{n:'계란',a:'2개'},{n:'밀가루',a:'1/2컵',p:1},{n:'토마토소스',a:'1.5컵'},{n:'모짜렐라치즈',a:'1컵'},{n:'파르메산치즈',a:'1/2컵'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['닭가슴살을 도톰하게 펴 밀가루·계란·빵가루를 입혀 굽는다.','구운 닭에 토마토소스를 올린다.','모짜렐라, 파르메산치즈를 듬뿍 올린다.','오븐이나 뚜껑을 덮어 치즈를 녹여 완성.'] },
+  { id:'we27', name:'감자 그라탱', cuisine:'양식', cat:'반찬', time:50, level:'보통',
+    ing:[{n:'감자',a:'4개'},{n:'생크림',a:'1.5컵'},{n:'우유',a:'1/2컵'},{n:'모짜렐라치즈',a:'1.5컵'},{n:'마늘',a:'2쪽'},{n:'버터',a:'1큰술'},{n:'소금',a:'약간',p:1}],
+    steps:['감자를 얇게 슬라이스한다.','생크림, 우유, 다진 마늘, 소금을 데운다.','버터 바른 그릇에 감자를 깔고 크림을 붓는다.','치즈를 올려 200도 오븐에 35분 구워 완성.'] },
+  { id:'we28', name:'베이컨 키쉬', cuisine:'양식', cat:'분식·간식', time:50, level:'보통',
+    ing:[{n:'냉동 파이지',a:'1장'},{n:'계란',a:'3개'},{n:'생크림',a:'1컵'},{n:'베이컨',a:'4줄'},{n:'시금치',a:'한줌'},{n:'양파',a:'1/2개'},{n:'모짜렐라치즈',a:'1컵'}],
+    steps:['파이지를 틀에 깔고 포크로 구멍을 낸다.','베이컨, 양파, 시금치를 볶는다.','계란, 생크림을 섞어 필링을 만든다.','볶은 재료와 치즈를 넣고 필링을 부어 180도 35분 구워 완성.'] },
+  { id:'we29', name:'미네스트로네', cuisine:'양식', cat:'국·찌개', time:40, level:'쉬움',
+    ing:[{n:'양파',a:'1개'},{n:'당근',a:'1개'},{n:'셀러리',a:'1대'},{n:'감자',a:'1개'},{n:'강낭콩',a:'1컵'},{n:'토마토소스',a:'1.5컵'},{n:'마카로니',a:'1/2컵'},{n:'올리브유',a:'2큰술',p:1}],
+    steps:['채소를 깍둑썰어 올리브유에 볶는다.','토마토소스와 물을 부어 끓인다.','강낭콩과 마카로니를 넣고 끓인다.','채소가 익고 국물이 어우러지면 완성.'] },
+  { id:'we30', name:'양송이 수프', cuisine:'양식', cat:'국·찌개', time:30, level:'쉬움',
+    ing:[{n:'양송이버섯',a:'10개'},{n:'양파',a:'1/2개'},{n:'생크림',a:'1컵'},{n:'우유',a:'1컵'},{n:'버터',a:'2큰술'},{n:'밀가루',a:'2큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['버터에 양파, 버섯을 볶는다.','밀가루를 넣어 볶다 우유를 조금씩 부어 푼다.','믹서에 곱게 갈아 다시 끓인다.','생크림을 넣고 소금으로 간해 완성.'] },
+  { id:'we31', name:'비프 스트로가노프', cuisine:'양식', cat:'볶음·구이', time:35, level:'보통',
+    ing:[{n:'소고기 등심',a:'300g'},{n:'양송이버섯',a:'6개'},{n:'양파',a:'1개'},{n:'생크림',a:'1컵'},{n:'버터',a:'2큰술'},{n:'밀가루',a:'1큰술',p:1},{n:'소금',a:'약간',p:1},{n:'후추',a:'약간',p:1}],
+    steps:['소고기를 길게 썰어 소금, 후추로 밑간한다.','버터에 고기를 볶아 덜어둔다.','양파, 버섯을 볶고 밀가루를 넣어 볶는다.','물과 생크림을 넣고 고기를 다시 넣어 끓여 완성(밥·파스타에 곁들임).'] },
+  { id:'we32', name:'감자 뇨끼', cuisine:'양식', cat:'밥·면', time:45, level:'어려움',
+    ing:[{n:'감자',a:'3개'},{n:'밀가루',a:'1컵',p:1},{n:'계란노른자',a:'1개'},{n:'토마토소스',a:'1.5컵'},{n:'파르메산치즈',a:'1/2컵'},{n:'소금',a:'약간',p:1}],
+    steps:['삶은 감자를 으깨 밀가루, 노른자, 소금과 반죽한다.','길게 밀어 한입 크기로 잘라 포크로 무늬를 낸다.','끓는 물에 삶아 떠오르면 건진다.','토마토소스에 버무리고 치즈를 뿌려 완성.'] },
+  { id:'we33', name:'피쉬앤칩스', cuisine:'양식', cat:'볶음·구이', time:40, level:'보통',
+    ing:[{n:'흰살생선',a:'400g'},{n:'감자',a:'3개'},{n:'밀가루',a:'1.5컵',p:1},{n:'맥주',a:'1컵'},{n:'베이킹파우더',a:'1작은술',p:1},{n:'타르타르소스',a:'적당량'},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['감자를 길게 썰어 노릇하게 튀긴다.','밀가루, 맥주, 베이킹파우더로 반죽을 만든다.','생선에 반죽을 입혀 바삭하게 튀긴다.','감자와 함께 담고 타르타르소스를 곁들여 완성.'] },
+  { id:'we34', name:'맥앤치즈', cuisine:'양식', cat:'밥·면', time:25, level:'쉬움',
+    ing:[{n:'마카로니',a:'2컵'},{n:'체다치즈',a:'2컵'},{n:'우유',a:'2컵'},{n:'버터',a:'2큰술'},{n:'밀가루',a:'2큰술',p:1},{n:'소금',a:'약간',p:1}],
+    steps:['마카로니를 삶는다.','버터에 밀가루를 볶아 우유를 조금씩 부어 화이트소스를 만든다.','체다치즈를 넣어 녹인다.','삶은 마카로니를 넣고 소금으로 간해 완성.'] },
+  { id:'we35', name:'슈니첼', cuisine:'양식', cat:'볶음·구이', time:30, level:'보통',
+    ing:[{n:'돼지등심',a:'2덩이'},{n:'빵가루',a:'1.5컵'},{n:'계란',a:'2개'},{n:'밀가루',a:'1/2컵',p:1},{n:'레몬',a:'1/2개'},{n:'소금',a:'약간',p:1},{n:'식용유',a:'넉넉히',p:1}],
+    steps:['등심을 얇게 두드려 펴고 소금으로 밑간한다.','밀가루, 계란물, 빵가루 순으로 옷을 입힌다.','넉넉한 기름에 노릇하게 지져 튀긴다.','레몬을 곁들여 완성.'] },
+  { id:'we36', name:'코코뱅', cuisine:'양식', cat:'국·찌개', time:70, level:'어려움',
+    ing:[{n:'닭다리',a:'4개'},{n:'레드와인',a:'2컵'},{n:'양송이버섯',a:'6개'},{n:'양파',a:'1개'},{n:'베이컨',a:'3줄'},{n:'마늘',a:'3쪽'},{n:'버터',a:'2큰술'},{n:'밀가루',a:'2큰술',p:1}],
+    steps:['닭에 밀가루를 입혀 버터에 겉면을 굽는다.','베이컨, 양파, 마늘, 버섯을 볶는다.','레드와인을 붓고 닭을 넣어 끓인다.','약불로 40분 졸여 소스가 진해지면 완성.'] },
+];
+
+DEFAULT_RECIPES.push(...EXTRA_RECIPES, ...EXTRA_RECIPES2);
+
+// ===== 상태 =====
+const STORE_KEY = 'sikdan_v1';
+const CFG_KEY = 'sikdan_fbcfg';      // Firebase 설정 저장 키
+const SHARE_DOC = 'household';       // 부부가 함께 보는 식단 문서 id
+const DOW = ['월','화','수','목','금','토','일'];
+const MEALS = [{k:'b',label:'아침',ic:'🌅'},{k:'l',label:'점심',ic:'🌤️'},{k:'d',label:'저녁',ic:'🌙'}];
+const PANTRY_NOTE = '기본 양념';
+
+let state = loadState();
+let recipes = [];
+function rebuildRecipes(){ recipes = DEFAULT_RECIPES.concat(state.custom || []); }
+rebuildRecipes();
+let weekOffset = 0;          // 0 = 이번 주
+let browseCuisine = '전체';
+let browseCanOnly = false;
+let pendingPick = null;      // {dayIdx, meal} 슬롯에서 시작한 경우
+let pendingRecipe = null;    // 메뉴에서 식단 담기 시작한 경우
+
+// 클라우드(부부 공유) 상태
+let db=null, cloudDocRef=null, cloudReady=false, applyingRemote=false;
+
+function loadState(){
+  try{
+    const s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if(s && typeof s==='object') return Object.assign({plan:{},fridge:[],fav:[],custom:[]}, s);
+  }catch(e){}
+  return {plan:{}, fridge:[], fav:[], custom:[]};
+}
+function saveState(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){} pushCloud(); }
+
+// ===== 날짜 유틸 =====
+function mondayOf(offset){
+  const d = new Date();
+  const day = (d.getDay()+6)%7;           // 월=0 ... 일=6
+  d.setDate(d.getDate()-day+offset*7);
+  d.setHours(0,0,0,0);
+  return d;
+}
+function fmt(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+function weekKey(offset){
+  const m = mondayOf(offset);
+  return m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')+'-'+String(m.getDate()).padStart(2,'0');
+}
+function isToday(d){ const t=new Date(); return d.getFullYear()===t.getFullYear()&&d.getMonth()===t.getMonth()&&d.getDate()===t.getDate(); }
+
+// ===== 재료 매칭 =====
+function norm(s){ return (s||'').replace(/\s+/g,'').toLowerCase(); }
+function inFridge(ingName){
+  const n = norm(ingName);
+  return state.fridge.some(f=>{ const fn=norm(f); return fn && (fn.includes(n)||n.includes(fn)); });
+}
+function matchRecipe(r){
+  const essential = r.ing.filter(i=>!i.p);
+  if(essential.length===0) return {status:'can', have:[], miss:[], ratio:1};
+  const have=[], miss=[];
+  essential.forEach(i=> inFridge(i.n) ? have.push(i.n) : miss.push(i.n));
+  const ratio = have.length/essential.length;
+  let status = miss.length===0 ? 'can' : (ratio>=0.5 ? 'partial' : 'none');
+  return {status, have, miss, ratio};
+}
+const STATUS_TXT = {
+  can:{badge:'🟢 지금 만들 수 있어요', label:'바로 가능'},
+  partial:{badge:'🟡 재료 조금만 더', label:'거의 가능'},
+  none:{badge:'⚪ 재료가 부족해요', label:'재료 부족'}
+};
+
+// ===== 렌더: 주간 식단 =====
+function renderWeek(){
+  const wk = weekKey(weekOffset);
+  const plan = state.plan[wk] || {};
+  const mon = mondayOf(weekOffset);
+  const sun = mondayOf(weekOffset); sun.setDate(sun.getDate()+6);
+  document.getElementById('weekLabel').childNodes[0].nodeValue =
+    weekOffset===0?'이번 주':(weekOffset===-1?'지난 주':(weekOffset===1?'다음 주':(weekOffset<0?(-weekOffset)+'주 전':weekOffset+'주 후')));
+  document.getElementById('weekRange').textContent = fmt(mon)+' ~ '+fmt(sun);
+
+  const box = document.getElementById('weekDays'); box.innerHTML='';
+  DOW.forEach((dow, di)=>{
+    const date = mondayOf(weekOffset); date.setDate(date.getDate()+di);
+    const today = isToday(date);
+    const card = document.createElement('div');
+    card.className = 'day-card'+(today?' today':'');
+    let html = `<div class="day-head"><span class="dow">${dow}</span><span class="date">${fmt(date)}</span>`
+      + (today?'<span class="badge-today">오늘</span>':'') + '</div>';
+    MEALS.forEach(m=>{
+      const ids = (plan[di] && plan[di][m.k]) || [];
+      let chips = ids.map(id=>{
+        const r = recipes.find(x=>x.id===id);
+        if(!r) return '';
+        return `<span class="meal-chip" data-open="${id}">${r.name}<span class="x" data-rm="${di}|${m.k}|${id}">✕</span></span>`;
+      }).join('');
+      html += `<div class="meal-row"><div class="meal-label">${m.ic} ${m.label}</div>`
+        + `<div class="meal-items">${chips}<button class="add-slot" data-slot="${di}|${m.k}">+ 추가</button></div></div>`;
+    });
+    card.innerHTML = html;
+    box.appendChild(card);
+  });
+}
+
+// ===== 렌더: 메뉴 찾기 =====
+function renderCuisineFilter(){
+  const cuisines = ['전체', ...new Set(recipes.map(r=>r.cuisine))];
+  const bar = document.getElementById('cuisineFilter'); bar.innerHTML='';
+  cuisines.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='chip-filter'+(browseCuisine===c?' active':'');
+    b.textContent=c; b.onclick=()=>{browseCuisine=c; renderBrowse(); renderCuisineFilter();};
+    bar.appendChild(b);
+  });
+}
+function statusBadge(st){ return `<span class="status-badge ${st}">${STATUS_TXT[st].badge}</span>`; }
+function menuCard(r, m){
+  const star = state.fav.includes(r.id)?'⭐':'☆';
+  let missLine='';
+  if(m.status==='partial' && m.miss.length) missLine = `<div class="missing-line">필요한 재료: <b>${m.miss.join(', ')}</b></div>`;
+  const own = r.custom?`<span class="own-badge">우리집</span>`:'';
+  return `<div class="menu-card" data-open="${r.id}">
+    <div class="top">
+      <div><div class="name">${r.name}${own}</div>
+      <div class="meta"><span>${r.cuisine}</span><span>⏱ ${r.time}분</span><span>${r.level}</span></div></div>
+      <button class="star" data-star="${r.id}">${star}</button>
+    </div>
+    ${statusBadge(m.status)}${missLine}
+  </div>`;
+}
+function renderBrowse(){
+  document.getElementById('browseHint').innerHTML = state.fridge.length
+    ? `🧊 냉장고 재료 <b>${state.fridge.length}개</b> 기준으로 골랐어요. 만들 수 있는 메뉴를 위에 먼저 보여드려요.`
+    : `🧊 <b>냉장고</b> 탭에 재료를 넣으면, 지금 만들 수 있는 메뉴를 알려드려요.`;
+  document.getElementById('tgCan').className='toggle-pill'+(browseCanOnly?' on':'');
+
+  let list = recipes.map(r=>({r, m:matchRecipe(r)}));
+  if(browseCuisine!=='전체') list = list.filter(x=>x.r.cuisine===browseCuisine);
+  if(browseCanOnly) list = list.filter(x=>x.m.status==='can');
+  const order = {can:0, partial:1, none:2};
+  list.sort((a,b)=> (order[a.m.status]-order[b.m.status]) || (b.m.ratio-a.m.ratio) || a.r.name.localeCompare(b.r.name,'ko'));
+
+  const grid=document.getElementById('browseGrid');
+  if(!list.length){ grid.innerHTML = `<div class="empty"><span class="big">🍽️</span>조건에 맞는 메뉴가 없어요.<br>필터를 바꿔보세요.</div>`; return; }
+  grid.innerHTML = list.map(x=>menuCard(x.r, x.m)).join('');
+}
+
+// ===== 렌더: 즐겨찾기 =====
+function renderFav(){
+  const grid=document.getElementById('favGrid');
+  const favs = recipes.filter(r=>state.fav.includes(r.id));
+  if(!favs.length){ grid.innerHTML = `<div class="empty"><span class="big">⭐</span>아직 즐겨찾기한 메뉴가 없어요.<br>메뉴를 열어 별을 달아보세요.</div>`; return; }
+  grid.innerHTML = favs.map(r=>menuCard(r, matchRecipe(r))).join('');
+}
+
+// ===== 렌더: 냉장고 =====
+const QUICK_INGREDIENTS = ['돼지고기','소고기','닭고기','계란','두부','양파','대파','당근','감자','애호박','김치','버섯','새우','연어','밥','면','우유','토마토','양배추','마늘'];
+function renderFridge(){
+  const cloud=document.getElementById('fridgeTags');
+  cloud.innerHTML = state.fridge.length
+    ? state.fridge.map((f,i)=>`<span class="fridge-tag">${f}<span class="x" data-fdel="${i}">✕</span></span>`).join('')
+    : `<div style="font-size:13px;color:var(--ink-faint);padding:4px 2px">아직 담은 재료가 없어요.</div>`;
+  const qa=document.getElementById('quickAdd');
+  qa.innerHTML = QUICK_INGREDIENTS.map(q=>{
+    const on = state.fridge.some(f=>norm(f)===norm(q));
+    return `<button class="${on?'added':''}" data-quick="${q}">${on?'✓ ':''}${q}</button>`;
+  }).join('');
+}
+function addFridge(name){
+  name = name.trim();
+  if(!name) return;
+  name.split(/[,，]/).map(s=>s.trim()).filter(Boolean).forEach(n=>{
+    if(!state.fridge.some(f=>norm(f)===norm(n))) state.fridge.push(n);
+  });
+  saveState(); renderFridge();
+}
+
+// ===== 모달: 레시피 상세 =====
+let currentRecipe = null;
+function openRecipe(id){
+  const r = recipes.find(x=>x.id===id); if(!r) return;
+  currentRecipe = r;
+  const m = matchRecipe(r);
+  document.getElementById('rmName').textContent = r.name;
+  document.getElementById('rmMeta').innerHTML = `<span>${r.cuisine}</span><span>⏱ ${r.time}분</span><span>난이도 ${r.level}</span>`;
+  let body = `<div class="recipe-status ${m.status}">${STATUS_TXT[m.status].badge}`;
+  if(m.status==='partial' && m.miss.length) body += ` — <b>${m.miss.join(', ')}</b>만 더 있으면 돼요.`;
+  if(m.status==='none' && !state.fridge.length) body = `<div class="recipe-status none">🧊 냉장고에 재료를 넣으면 가능 여부를 알려드려요.`;
+  body += `</div>`;
+  body += `<div class="block-title">🧺 재료</div><div class="ing-list">`;
+  r.ing.forEach(i=>{
+    if(i.p){ body += `<div class="ing-item pantry"><span class="check">·</span><span class="nm">${i.n}</span><span class="amt">${i.a}</span><span class="tag-p">${PANTRY_NOTE}</span></div>`; }
+    else { const has=inFridge(i.n);
+      body += `<div class="ing-item ${has?'have':'miss'}"><span class="check">${has?'✓':'+'}</span><span class="nm">${i.n}</span><span class="amt">${i.a}</span></div>`; }
+  });
+  body += `</div>`;
+  body += `<div class="block-title">👩‍🍳 만드는 법</div><div class="steps-list">`;
+  r.steps.forEach(s=> body += `<div class="step">${s}</div>`);
+  body += `</div>`;
+  if(r.custom){
+    body += `<div class="custom-tools">
+      <button class="edit" data-edit="${r.id}">✏️ 수정</button>
+      <button class="del" data-delete="${r.id}">🗑 삭제</button>
+    </div>`;
+  }
+  document.getElementById('rmBody').innerHTML = body;
+  const starred = state.fav.includes(r.id);
+  const sb = document.getElementById('rmStar');
+  sb.className = 'btn btn-ghost'+(starred?' starred':'');
+  sb.innerHTML = starred?'⭐ 즐겨찾기 됨':'☆ 즐겨찾기';
+  openModal('recipeModal');
+}
+
+// ===== 모달: 메뉴 고르기 (슬롯 → 메뉴) =====
+function openPicker(dayIdx, meal){
+  pendingPick = {dayIdx, meal};
+  document.getElementById('pickerSearch').value='';
+  document.getElementById('pickerTitle').textContent =
+    `${DOW[dayIdx]}요일 ${MEALS.find(x=>x.k===meal).label} 메뉴`;
+  renderPickerList('');
+  openModal('pickerModal');
+  setTimeout(()=>document.getElementById('pickerSearch').focus(), 280);
+}
+function renderPickerList(q){
+  q = norm(q);
+  const favFirst = recipes.slice().sort((a,b)=>{
+    const fa=state.fav.includes(a.id)?0:1, fb=state.fav.includes(b.id)?0:1;
+    return fa-fb || a.name.localeCompare(b.name,'ko');
+  });
+  const filtered = q ? favFirst.filter(r=>norm(r.name).includes(q)||norm(r.cuisine).includes(q)) : favFirst;
+  const list=document.getElementById('pickerList');
+  if(!filtered.length){ list.innerHTML=`<div class="empty" style="padding:24px"><span class="big">🔍</span>"${q}" 메뉴가 없어요.</div>`; return; }
+  list.innerHTML = filtered.slice(0,60).map(r=>{
+    const m=matchRecipe(r);
+    const dot = m.status==='can'?'🟢':(m.status==='partial'?'🟡':'⚪');
+    const fav = state.fav.includes(r.id)?'⭐ ':'';
+    return `<div class="picker-item" data-pick="${r.id}"><span class="st">${dot}</span><span class="nm">${fav}${r.name}</span><span class="sub">${r.cuisine} · ${r.time}분</span></div>`;
+  }).join('');
+}
+function pickMenu(id){
+  if(!pendingPick) return;
+  const {dayIdx, meal} = pendingPick;
+  addToPlan(weekOffset, dayIdx, meal, id);
+  closeModal('pickerModal');
+  pendingPick=null;
+  const r=recipes.find(x=>x.id===id);
+  toast(`${r.name} 담았어요 ✓`);
+}
+
+// ===== 모달: 끼니 선택 (메뉴 → 슬롯) =====
+function openDest(recipeId){
+  pendingRecipe = recipeId;
+  const r=recipes.find(x=>x.id===recipeId);
+  document.getElementById('destTitle').textContent = `'${r.name}' 어디에 담을까요?`;
+  const wk = weekOffset;
+  const grid=document.getElementById('destGrid'); grid.innerHTML='';
+  DOW.forEach((dow,di)=>{
+    const date=mondayOf(wk); date.setDate(date.getDate()+di);
+    const wrap=document.createElement('div'); wrap.className='dest-day';
+    wrap.innerHTML = `<div class="dn">${dow} <span style="color:var(--ink-faint)">${fmt(date)}</span></div>`
+      + `<div class="dest-meals">${MEALS.map(m=>`<button data-dest="${di}|${m.k}">${m.ic} ${m.label}</button>`).join('')}</div>`;
+    grid.appendChild(wrap);
+  });
+  openModal('destModal');
+}
+function addToPlan(wkOffset, dayIdx, meal, recipeId){
+  const wk = weekKey(wkOffset);
+  if(!state.plan[wk]) state.plan[wk]={};
+  if(!state.plan[wk][dayIdx]) state.plan[wk][dayIdx]={};
+  if(!state.plan[wk][dayIdx][meal]) state.plan[wk][dayIdx][meal]=[];
+  if(!state.plan[wk][dayIdx][meal].includes(recipeId)) state.plan[wk][dayIdx][meal].push(recipeId);
+  saveState(); renderWeek();
+}
+function removeFromPlan(dayIdx, meal, recipeId){
+  const wk=weekKey(weekOffset);
+  if(state.plan[wk] && state.plan[wk][dayIdx] && state.plan[wk][dayIdx][meal]){
+    state.plan[wk][dayIdx][meal] = state.plan[wk][dayIdx][meal].filter(x=>x!==recipeId);
+  }
+  saveState(); renderWeek();
+}
+
+// ===== 즐겨찾기 토글 =====
+function toggleFav(id){
+  const i = state.fav.indexOf(id);
+  if(i>=0){ state.fav.splice(i,1); toast('즐겨찾기에서 뺐어요'); }
+  else { state.fav.push(id); toast('즐겨찾기에 담았어요 ⭐'); }
+  saveState();
+  refreshAll();
+}
+
+// ===== 모달 공통 =====
+function openModal(id){ document.getElementById(id).classList.add('open'); document.body.style.overflow='hidden'; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); document.body.style.overflow=''; }
+function closeAllModals(){ document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open')); document.body.style.overflow=''; }
+
+// ===== 토스트 =====
+let toastT;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 1700);
+}
+
+// ===== 탭 전환 =====
+function switchTab(tab){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  if(tab==='plan') renderWeek();
+  if(tab==='browse'){ renderCuisineFilter(); renderBrowse(); }
+  if(tab==='fridge') renderFridge();
+  if(tab==='fav') renderFav();
+  window.scrollTo(0,0);
+}
+function refreshAll(){
+  const active = document.querySelector('nav.tabs button.active').dataset.tab;
+  if(active==='browse') renderBrowse();
+  if(active==='fav') renderFav();
+}
+function rerenderActive(){
+  const active = document.querySelector('nav.tabs button.active').dataset.tab;
+  if(active==='plan') renderWeek();
+  if(active==='browse'){ renderCuisineFilter(); renderBrowse(); }
+  if(active==='fridge') renderFridge();
+  if(active==='fav') renderFav();
+}
+
+// ===== 이벤트 바인딩 =====
+document.getElementById('tabs').addEventListener('click', e=>{
+  const b=e.target.closest('button[data-tab]'); if(b) switchTab(b.dataset.tab);
+});
+document.getElementById('weekPrev').onclick=()=>{ weekOffset--; renderWeek(); };
+document.getElementById('weekNext').onclick=()=>{ weekOffset++; renderWeek(); };
+
+// 주간 식단 클릭 (슬롯 추가 / 칩 열기 / 칩 삭제)
+document.getElementById('weekDays').addEventListener('click', e=>{
+  const slot=e.target.closest('[data-slot]');
+  const rm=e.target.closest('[data-rm]');
+  const open=e.target.closest('[data-open]');
+  if(rm){ e.stopPropagation(); const [d,m,id]=rm.dataset.rm.split('|'); removeFromPlan(+d,m,id); return; }
+  if(slot){ const [d,m]=slot.dataset.slot.split('|'); openPicker(+d,m); return; }
+  if(open){ openRecipe(open.dataset.open); }
+});
+
+// 메뉴 찾기 / 즐겨찾기 카드 클릭
+function gridClick(e){
+  const star=e.target.closest('[data-star]');
+  const card=e.target.closest('[data-open]');
+  if(star){ e.stopPropagation(); toggleFav(star.dataset.star); return; }
+  if(card){ openRecipe(card.dataset.open); }
+}
+document.getElementById('browseGrid').addEventListener('click', gridClick);
+document.getElementById('favGrid').addEventListener('click', gridClick);
+document.getElementById('tgCan').onclick=()=>{ browseCanOnly=!browseCanOnly; renderBrowse(); };
+
+// 냉장고
+document.getElementById('fridgeAdd').onclick=()=>{ const inp=document.getElementById('fridgeInput'); addFridge(inp.value); inp.value=''; inp.focus(); };
+document.getElementById('fridgeInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ addFridge(e.target.value); e.target.value=''; } });
+document.getElementById('fridgeTags').addEventListener('click', e=>{
+  const x=e.target.closest('[data-fdel]'); if(x){ state.fridge.splice(+x.dataset.fdel,1); saveState(); renderFridge(); }
+});
+document.getElementById('quickAdd').addEventListener('click', e=>{
+  const b=e.target.closest('[data-quick]'); if(!b) return;
+  const name=b.dataset.quick; const idx=state.fridge.findIndex(f=>norm(f)===norm(name));
+  if(idx>=0) state.fridge.splice(idx,1); else state.fridge.push(name);
+  saveState(); renderFridge();
+});
+
+// 레시피 모달 액션
+document.getElementById('rmStar').onclick=()=>{ if(currentRecipe){ toggleFav(currentRecipe.id); openRecipe(currentRecipe.id); } };
+document.getElementById('rmAddPlan').onclick=()=>{ if(currentRecipe){ closeModal('recipeModal'); openDest(currentRecipe.id); } };
+
+// 메뉴 고르기 모달
+document.getElementById('pickerSearch').addEventListener('input', e=> renderPickerList(e.target.value));
+document.getElementById('pickerList').addEventListener('click', e=>{ const it=e.target.closest('[data-pick]'); if(it) pickMenu(it.dataset.pick); });
+
+// 끼니 선택 모달
+document.getElementById('destGrid').addEventListener('click', e=>{
+  const b=e.target.closest('[data-dest]'); if(!b||!pendingRecipe) return;
+  const [d,m]=b.dataset.dest.split('|');
+  addToPlan(weekOffset, +d, m, pendingRecipe);
+  closeModal('destModal');
+  const r=recipes.find(x=>x.id===pendingRecipe);
+  toast(`${DOW[+d]}요일 ${MEALS.find(x=>x.k===m).label}에 담았어요 ✓`);
+  pendingRecipe=null;
+});
+
+// 모달 닫기 (배경 클릭 / ✕)
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+  bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeAllModals(); });
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAllModals(); });
+
+// ===== 우리집 메뉴 추가/편집 =====
+let editingId = null;
+function edIngRow(n='', a='', p=false){
+  const div = document.createElement('div'); div.className='ed-row';
+  div.innerHTML = `<input class="ed-input nm" type="text" placeholder="재료명" value="${escapeAttr(n)}">`
+    + `<input class="ed-input amt" type="text" placeholder="양" value="${escapeAttr(a)}">`
+    + `<label class="pchk${p?' on':''}"><input type="checkbox" ${p?'checked':''}>양념</label>`
+    + `<button class="del" type="button" title="삭제">✕</button>`;
+  div.querySelector('.pchk').onclick=(e)=>{ const c=div.querySelector('input[type=checkbox]'); if(e.target.tagName!=='INPUT') c.checked=!c.checked; div.querySelector('.pchk').classList.toggle('on', c.checked); };
+  div.querySelector('.del').onclick=()=>div.remove();
+  document.getElementById('edIngRows').appendChild(div);
+}
+function edStepRow(t=''){
+  const cont=document.getElementById('edStepRows');
+  const div=document.createElement('div'); div.className='ed-row';
+  div.innerHTML = `<span class="step-num">${cont.children.length+1}</span>`
+    + `<input class="ed-input" type="text" placeholder="조리 순서" value="${escapeAttr(t)}">`
+    + `<button class="del" type="button" title="삭제">✕</button>`;
+  div.querySelector('.del').onclick=()=>{ div.remove(); renumberSteps(); };
+  cont.appendChild(div);
+}
+function renumberSteps(){ [...document.getElementById('edStepRows').children].forEach((d,i)=>{ const n=d.querySelector('.step-num'); if(n) n.textContent=i+1; }); }
+function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+
+function openEditor(id){
+  editingId = id || null;
+  document.getElementById('editorTitle').textContent = id ? '우리집 메뉴 수정' : '우리집 메뉴 추가';
+  document.getElementById('edIngRows').innerHTML='';
+  document.getElementById('edStepRows').innerHTML='';
+  if(id){
+    const r = recipes.find(x=>x.id===id);
+    document.getElementById('edName').value=r.name;
+    document.getElementById('edCuisine').value = [...document.getElementById('edCuisine').options].some(o=>o.value===r.cuisine)?r.cuisine:'우리집';
+    document.getElementById('edCat').value = r.cat;
+    document.getElementById('edTime').value = r.time;
+    document.getElementById('edLevel').value = r.level;
+    r.ing.forEach(i=>edIngRow(i.n, i.a, !!i.p));
+    r.steps.forEach(s=>edStepRow(s));
+  } else {
+    document.getElementById('edName').value='';
+    document.getElementById('edCuisine').value='우리집';
+    document.getElementById('edCat').value='밥·면';
+    document.getElementById('edTime').value='';
+    document.getElementById('edLevel').value='쉬움';
+    edIngRow(); edIngRow();
+    edStepRow(); edStepRow();
+  }
+  openModal('editorModal');
+}
+function saveCustomRecipe(){
+  const name=document.getElementById('edName').value.trim();
+  if(!name){ toast('메뉴 이름을 입력해 주세요'); return; }
+  const ing=[];
+  [...document.getElementById('edIngRows').children].forEach(row=>{
+    const n=row.querySelector('.nm').value.trim();
+    const a=row.querySelector('.amt').value.trim();
+    const p=row.querySelector('input[type=checkbox]').checked;
+    if(n){ const o={n, a:a||'적당량'}; if(p) o.p=1; ing.push(o); }
+  });
+  const steps=[];
+  [...document.getElementById('edStepRows').children].forEach(row=>{ const t=row.querySelector('.ed-input').value.trim(); if(t) steps.push(t); });
+  if(!ing.length){ toast('재료를 1개 이상 넣어 주세요'); return; }
+  if(!steps.length){ toast('만드는 법을 1단계 이상 넣어 주세요'); return; }
+  const rec = {
+    id: editingId || ('custom_'+Date.now()),
+    name, cuisine: document.getElementById('edCuisine').value,
+    cat: document.getElementById('edCat').value,
+    time: parseInt(document.getElementById('edTime').value,10) || 30,
+    level: document.getElementById('edLevel').value,
+    ing, steps, custom:true
+  };
+  if(!state.custom) state.custom=[];
+  if(editingId){ state.custom = state.custom.map(r=>r.id===editingId?rec:r); }
+  else { state.custom.push(rec); }
+  saveState(); rebuildRecipes();
+  closeModal('editorModal');
+  toast(editingId?'메뉴를 수정했어요 ✓':'우리집 메뉴를 담았어요 ⭐');
+  editingId=null;
+  switchTab('browse');
+}
+function deleteCustomRecipe(id){
+  state.custom = (state.custom||[]).filter(r=>r.id!==id);
+  state.fav = state.fav.filter(f=>f!==id);
+  Object.keys(state.plan).forEach(wk=>Object.keys(state.plan[wk]).forEach(di=>Object.keys(state.plan[wk][di]).forEach(mk=>{
+    state.plan[wk][di][mk]=state.plan[wk][di][mk].filter(x=>x!==id);
+  })));
+  saveState(); rebuildRecipes();
+  closeModal('recipeModal');
+  toast('메뉴를 삭제했어요');
+  refreshAll();
+}
+
+document.getElementById('addOwnBtn').onclick=()=>openEditor(null);
+document.getElementById('edAddIng').onclick=()=>edIngRow();
+document.getElementById('edAddStep').onclick=()=>edStepRow();
+document.getElementById('edSave').onclick=saveCustomRecipe;
+document.getElementById('rmBody').addEventListener('click', e=>{
+  const ed=e.target.closest('[data-edit]'); const del=e.target.closest('[data-delete]');
+  if(ed){ closeModal('recipeModal'); openEditor(ed.dataset.edit); }
+  if(del){ const r=recipes.find(x=>x.id===del.dataset.delete); if(confirm(`'${r?r.name:''}' 메뉴를 삭제할까요?`)) deleteCustomRecipe(del.dataset.delete); }
+});
+
+// ===== 부부 공유 (Firebase 실시간 동기화) =====
+function getStoredCfg(){
+  try{ const c=JSON.parse(localStorage.getItem(CFG_KEY)); if(c && c.apiKey && c.projectId) return c; }catch(e){}
+  return null;
+}
+function parseFirebaseConfig(text){
+  const get=(k)=>{ const m=text.match(new RegExp(k+"\\s*:\\s*['\"]([^'\"]+)['\"]")); return m?m[1]:''; };
+  return {
+    apiKey:get('apiKey'), authDomain:get('authDomain'), projectId:get('projectId'),
+    storageBucket:get('storageBucket'), messagingSenderId:get('messagingSenderId'), appId:get('appId')
+  };
+}
+function updateSyncChip(mode){
+  const chip=document.getElementById('syncChip');
+  chip.className='sync-chip'+(mode==='synced'?' on':(mode==='error'?' err':''));
+  chip.textContent = mode==='synced'?'☁️ 공유 중':(mode==='error'?'⚠️ 연결 오류':'📱 이 기기');
+}
+function initCloud(){
+  const cfg=getStoredCfg();
+  if(!cfg){ updateSyncChip('local'); return; }
+  if(typeof firebase==='undefined'){ updateSyncChip('error'); return; }
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(cfg);
+    db=firebase.firestore();
+    cloudDocRef=db.collection('mealplan').doc(SHARE_DOC);
+    cloudReady=true;
+    updateSyncChip('synced');
+    cloudDocRef.onSnapshot(snap=>{
+      if(snap.exists){
+        const data=snap.data();
+        if(data && data.state){
+          let remote; try{ remote=JSON.parse(data.state); }catch(e){ return; }
+          if(JSON.stringify(remote)===JSON.stringify(state)) { updateSyncChip('synced'); return; }
+          applyingRemote=true;
+          state=Object.assign({plan:{},fridge:[],fav:[],custom:[]}, remote);
+          try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+          rebuildRecipes();
+          rerenderActive();
+          applyingRemote=false;
+        }
+      } else {
+        pushCloud(); // 원격에 아직 없으면 현재 상태를 올림
+      }
+      updateSyncChip('synced');
+    }, err=>{ cloudReady=false; updateSyncChip('error'); });
+  }catch(e){ cloudReady=false; updateSyncChip('error'); }
+}
+function pushCloud(){
+  if(!cloudReady || applyingRemote || !cloudDocRef) return;
+  cloudDocRef.set({state:JSON.stringify(state), updatedAt:Date.now()}).catch(()=>updateSyncChip('error'));
+}
+function openShareModal(){
+  const cfg=getStoredCfg();
+  const st=document.getElementById('shareStatus');
+  const disc=document.getElementById('shareDisconnected');
+  const conn=document.getElementById('shareConnected');
+  const btnC=document.getElementById('shareConnect');
+  const btnD=document.getElementById('shareDisconnect');
+  document.getElementById('shareCfg').value='';
+  if(cfg && cloudReady){
+    st.className='share-status synced'; st.innerHTML='☁️ 공유 연결됨 — 두 사람이 같은 식단을 봐요';
+    disc.style.display='none'; conn.style.display='block';
+    btnC.style.display='none'; btnD.style.display='block';
+  } else if(cfg && !cloudReady){
+    st.className='share-status error'; st.innerHTML='⚠️ 설정은 있지만 연결에 실패했어요. 인터넷·설정을 확인해 주세요.';
+    disc.style.display='block'; conn.style.display='none';
+    btnC.style.display='block'; btnD.style.display='block';
+  } else {
+    st.className='share-status local'; st.innerHTML='📱 지금은 이 기기에만 저장돼요';
+    disc.style.display='block'; conn.style.display='none';
+    btnC.style.display='block'; btnD.style.display='none';
+  }
+  openModal('shareModal');
+}
+function connectShare(){
+  const text=document.getElementById('shareCfg').value.trim();
+  if(!text){ toast('Firebase 설정을 붙여넣어 주세요'); return; }
+  const cfg=parseFirebaseConfig(text);
+  if(!cfg.apiKey || !cfg.projectId){ toast('apiKey와 projectId를 찾지 못했어요. 설정을 다시 확인해 주세요'); return; }
+  try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){}
+  toast('연결할게요. 잠시만요…');
+  setTimeout(()=>location.reload(), 700);
+}
+function disconnectShare(){
+  if(!confirm('공유를 해제할까요? 이 기기에만 저장되는 모드로 돌아가요. (식단·메뉴 데이터는 그대로 남아요)')) return;
+  try{ localStorage.removeItem(CFG_KEY); }catch(e){}
+  setTimeout(()=>location.reload(), 300);
+}
+document.getElementById('syncChip').onclick=openShareModal;
+document.getElementById('shareConnect').onclick=connectShare;
+document.getElementById('shareDisconnect').onclick=disconnectShare;
+
+// ===== 시작 =====
+renderWeek();
+initCloud();
+</script>
+</body>
+</html>

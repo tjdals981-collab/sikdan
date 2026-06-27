@@ -1614,7 +1614,7 @@ function renderPickerList(q){
   const filtered = q ? favFirst.filter(r=>norm(r.name).includes(q)||norm(r.cuisine).includes(q)) : favFirst;
   const list=document.getElementById('pickerList');
   if(!filtered.length){ list.innerHTML=`<div class="empty" style="padding:24px"><span class="big">🔍</span>"${q}" 메뉴가 없어요.</div>`; return; }
-  list.innerHTML = filtered.slice(0,60).map(r=>{
+  list.innerHTML = filtered.map(r=>{
     const m=matchRecipe(r);
     const dot = m.status==='can'?'🟢':(m.status==='partial'?'🟡':'⚪');
     const fav = state.fav.includes(r.id)?'⭐ ':'';

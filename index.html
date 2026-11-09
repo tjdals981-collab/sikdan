@@ -268,6 +268,15 @@ footer{text-align:center;font-size:11px;color:var(--ink-faint);padding:8px 0 4px
 .shop-item .links a{font-size:11.5px;font-weight:700;text-decoration:none;border-radius:8px;padding:5px 7px;border:1px solid var(--line);color:var(--ink)}
 .shop-item .links a.cp{color:#E52528;border-color:#F3C2C3}
 .shop-item .links a.ku{color:#5F0080;border-color:#D9C2E3}
+.plan-tools.sub{margin-top:-6px}
+.plan-tools.sub button{font-size:13px;padding:9px 8px;box-shadow:none}
+.sides-card{border-color:var(--orange);}
+.sides-card .day-head{background:var(--orange-tint);flex-wrap:wrap}
+.sides-card .meal-row{padding:11px 14px}
+.sides-empty{font-size:13px;color:var(--ink-soft)}
+.mini-btn{margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:4px 9px;font-size:12px;font-family:inherit;cursor:pointer;color:var(--ink)}
+.meal-chip .srv{font-size:10.5px;font-weight:700;background:var(--orange);color:#fff;border-radius:6px;padding:1px 5px}
+.meal-chip.leftover{background:var(--surface-2);color:var(--ink-soft);border:1px dashed var(--line)}
 .shop-empty{text-align:center;color:var(--ink-soft);font-size:14px;padding:26px 10px;line-height:1.6}
 </style>
 </head>
@@ -299,6 +308,10 @@ footer{text-align:center;font-size:11px;color:var(--ink-faint);padding:8px 0 4px
     <div class="plan-tools">
       <button class="primary" id="autoPlanBtn">✨ 자동으로 짜기</button>
       <button id="shopBtn">🛒 장보기 목록<span class="cnt" id="shopCnt" style="display:none"></span></button>
+    </div>
+    <div class="plan-tools sub">
+      <button id="undoBtn" style="display:none">↩️ 되돌리기</button>
+      <button id="rerollBtn" style="display:none">🔄 다시 짜기</button>
     </div>
     <div id="weekDays"></div>
   </section>
@@ -2022,13 +2035,27 @@ document.getElementById('shareDisconnect').onclick=disconnectShare;
 const AUTO_DEFAULT = {
   meals: { wd:{b:false,l:false,d:true}, we:{b:false,l:true,d:true} }, // 평일/주말 × 아침/점심/저녁
   fillEmptyOnly: true,
-  side: true,        // 한식 메인엔 반찬 1개 곁들이기
-  quickWeekday: true // 평일엔 40분 이내 메뉴 위주
+  batchSides: true,   // 일요일에 밑반찬 3개 만들어 한 주 동안 먹기
+  leftover: true,     // 화·목은 혼자 → 월·수 저녁을 3인분 만들어 다음 날 먹기
+  quickWeekday: true  // 평일엔 40분 이내 메뉴 위주
 };
-function autoOpt(){ return Object.assign({}, AUTO_DEFAULT, state.autoOpt||{}, {meals: Object.assign({}, AUTO_DEFAULT.meals, (state.autoOpt||{}).meals||{})}); }
+function autoOpt(){ const s=state.autoOpt||{}; return Object.assign({}, AUTO_DEFAULT, s, {meals: Object.assign({}, AUTO_DEFAULT.meals, s.meals||{})}); }
 
 const MAIN_CATS = ['국·찌개','볶음·구이','밥·면'];
 const LIGHT_CATS = ['밥·면','샐러드·가벼운','분식·간식'];
+const SIDE_COUNT = 3;
+// 남은 음식 규칙: 화(1) 저녁 ← 월(0) 저녁, 목(3) 저녁 ← 수(2) 저녁
+const LEFTOVER_FROM = {1:0, 3:2};
+const COOK_BIG = {0:true, 2:true};   // 3인분 만드는 날
+
+// 물·얼음처럼 살 필요 없는 재료
+const SHOP_IGNORE = ['물','찬물','뜨거운물','따뜻한물','얼음','얼음물'].map(normKey);
+function needBuy(i){ return !i.p && !SHOP_IGNORE.includes(normKey(i.n)) && !inFridge(i.n); }
+function missKeys(r){ return r.ing.filter(needBuy).map(i=>coreNoun(i.n)); }
+function mainKeys(r){ return r.ing.filter(i=>!i.p).map(i=>coreNoun(i.n)); }
+
+function weekSides(wkOffset){ return ((state.sides||{})[weekKey(wkOffset)] || []).filter(id=>recipes.some(r=>r.id===id)); }
+function isLeftoverSlot(di, mk){ return autoOpt().leftover && mk==='d' && LEFTOVER_FROM[di]!==undefined; }
 
 // 최근 2주 동안 식단에 나온 메뉴 (반복 줄이기)
 function recentIds(wkOffset){
@@ -2036,16 +2063,10 @@ function recentIds(wkOffset){
   [wkOffset-1, wkOffset-2].forEach(o=>{
     const p = state.plan[weekKey(o)] || {};
     Object.values(p).forEach(day=>Object.values(day||{}).forEach(ids=>(ids||[]).forEach(id=>set.add(id))));
+    weekSides(o).forEach(id=>set.add(id));
   });
   return set;
 }
-
-// 메뉴가 고른 재료 중 '사야 할 것' 목록 (핵심 명사 기준)
-// 물·얼음처럼 살 필요 없는 재료
-const SHOP_IGNORE = ['물','찬물','뜨거운물','따뜻한물','얼음','얼음물'].map(normKey);
-function needBuy(i){ return !i.p && !SHOP_IGNORE.includes(normKey(i.n)) && !inFridge(i.n); }
-function missKeys(r){ return r.ing.filter(needBuy).map(i=>coreNoun(i.n)); }
-function mainKeys(r){ return r.ing.filter(i=>!i.p).map(i=>coreNoun(i.n)); }
 
 function pickRecipe(pool, ctx){
   let best=null, bestScore=-1e9;
@@ -2055,30 +2076,58 @@ function pickRecipe(pool, ctx){
     let sc = m.ratio*3;                                   // 냉장고 재료 활용
     if(state.fav.includes(r.id)) sc += 1.5;               // 즐겨찾기 우대
     if(ctx.recent.has(r.id)) sc -= 2;                     // 최근 2주 반복 줄이기
-    if(ctx.prevCuisine && r.cuisine===ctx.prevCuisine) sc -= 0.6; // 같은 나라 요리 연속 줄이기
+    if(ctx.prevCuisine && r.cuisine===ctx.prevCuisine && r.cuisine!=='한식') sc -= 1.2; // 같은 나라 요리 연속 줄이기
     if(ctx.quick && r.time>40) sc -= 1.2;                 // 평일엔 빨리 되는 메뉴
     const mk = missKeys(r);
     const shared = mk.filter(k=>ctx.buy.has(k)).length;   // 이미 사기로 한 재료 같이 쓰기
     sc += shared*0.4 - (mk.length-shared)*0.25;
-    if(ctx.avoid){ const ov = mainKeys(r).filter(k=>ctx.avoid.has(k)).length; sc -= ov*1.5; } // 반찬이 메인과 같은 재료면 감점
+    if(ctx.avoid){ const ov = mainKeys(r).filter(k=>ctx.avoid.has(k)).length; sc -= ov*3; }
+    if(ctx.keyCount){ sc -= mainKeys(r).reduce((a,k)=>a+(ctx.keyCount[k]||0),0)*0.35; } // 한 주에 같은 재료만 반복되지 않게 // 같은 주재료 겹치면 감점
     sc += Math.random()*1.2;                              // 매번 조금씩 다르게
     if(sc>bestScore){ bestScore=sc; best=r; }
   });
   return best;
 }
 
+// 되돌리기용으로 지금 상태를 저장
+function saveUndo(wkOffset){
+  const wk = weekKey(wkOffset);
+  state.autoUndo = { wk, plan: JSON.parse(JSON.stringify(state.plan[wk]||{})), sides: weekSides(wkOffset).slice() };
+}
+function undoAuto(){
+  const u = state.autoUndo; if(!u) return false;
+  state.plan[u.wk] = u.plan;
+  state.sides = state.sides || {}; state.sides[u.wk] = u.sides;
+  delete state.autoUndo;
+  saveState(); return true;
+}
+
+function pickSides(ctx, soft){
+  const sides = recipes.filter(r=>r.cat==='반찬');
+  const out = [];
+  for(let n=0; n<SIDE_COUNT; n++){
+    const avoid = new Set(out.flatMap(id=>mainKeys(recipes.find(r=>r.id===id))));
+    if(soft) soft.forEach(k=>{ if(Math.random()<0.5) avoid.add(k); });   // 메인 재료와는 너무 겹치지 않게(약하게)
+    const s = pickRecipe(sides, Object.assign({}, ctx, {prevCuisine:null, quick:false, avoid}));
+    if(!s) break;
+    out.push(s.id); ctx.used.add(s.id); missKeys(s).forEach(k=>ctx.buy.add(k)); if(ctx.keyCount) mainKeys(s).forEach(k=>ctx.keyCount[k]=(ctx.keyCount[k]||0)+1);
+  }
+  return out;
+}
+
 function runAutoPlan(wkOffset){
   const opt = autoOpt();
   const wk = weekKey(wkOffset);
-  const plan = JSON.parse(JSON.stringify(state.plan[wk] || {}));
+  saveUndo(wkOffset);
+  const plan = opt.fillEmptyOnly ? JSON.parse(JSON.stringify(state.plan[wk] || {})) : {};
   const ctx = { used:new Set(), recent:recentIds(wkOffset), buy:new Set(), prevCuisine:null, quick:false };
-  // 이미 들어 있는 메뉴도 '사용됨'으로 계산
-  Object.values(plan).forEach(day=>Object.values(day||{}).forEach(ids=>(ids||[]).forEach(id=>{
-    ctx.used.add(id); const r=recipes.find(x=>x.id===id); if(r) missKeys(r).forEach(k=>ctx.buy.add(k));
-  })));
+  ctx.keyCount = {};
+  const noteUsed = id=>{ ctx.used.add(id); const r=recipes.find(x=>x.id===id); if(r){ missKeys(r).forEach(k=>ctx.buy.add(k)); mainKeys(r).forEach(k=>ctx.keyCount[k]=(ctx.keyCount[k]||0)+1); } };
+  Object.values(plan).forEach(day=>Object.values(day||{}).forEach(ids=>(ids||[]).forEach(noteUsed)));
+
   const mains = recipes.filter(r=>MAIN_CATS.includes(r.cat));
+  const bigMains = mains.filter(r=>r.cat!=='밥·면' && r.ing.filter(i=>!i.p).length>=4);      // 3인분은 다음 날 데워 먹기 좋은 찌개·볶음 위주
   const lights = recipes.filter(r=>LIGHT_CATS.includes(r.cat) && r.time<=20);
-  const sides = recipes.filter(r=>r.cat==='반찬');
   let added = 0;
   for(let di=0; di<7; di++){
     const weekend = di>=5;
@@ -2086,24 +2135,38 @@ function runAutoPlan(wkOffset){
     plan[di] = plan[di] || {};
     MEALS.forEach(m=>{
       if(!want[m.k]) return;
+      if(isLeftoverSlot(di, m.k)) return;                 // 화·목 저녁은 전날 남은 것
       const cur = plan[di][m.k] || [];
-      if(opt.fillEmptyOnly && cur.length) { const r=recipes.find(x=>x.id===cur[0]); if(r) ctx.prevCuisine=r.cuisine; return; }
+      if(cur.length){ const r=recipes.find(x=>x.id===cur[0]); if(r) ctx.prevCuisine=r.cuisine; return; }
       ctx.quick = opt.quickWeekday && !weekend;
-      const main = pickRecipe(m.k==='b' ? lights : mains, ctx);
+      const big = opt.leftover && m.k==='d' && COOK_BIG[di];
+      const main = pickRecipe(m.k==='b' ? lights : (big ? bigMains : mains), ctx);
       if(!main) return;
-      const ids = opt.fillEmptyOnly ? cur.slice() : [];
-      ids.push(main.id); ctx.used.add(main.id); missKeys(main).forEach(k=>ctx.buy.add(k)); added++;
+      plan[di][m.k] = [main.id]; noteUsed(main.id); added++;
       ctx.prevCuisine = main.cuisine;
-      if(opt.side && m.k!=='b' && main.cuisine==='한식' && main.cat!=='밥·면'){
-        const side = pickRecipe(sides, Object.assign({}, ctx, {prevCuisine:null, quick:false, avoid:new Set(mainKeys(main))}));
-        if(side){ ids.push(side.id); ctx.used.add(side.id); missKeys(side).forEach(k=>ctx.buy.add(k)); }
-      }
-      plan[di][m.k] = ids;
     });
   }
+  // 밑반찬 3개 (일요일에 만들어 두기) — 메인과 주재료가 겹치지 않게
+  state.sides = state.sides || {};
+  let sides = opt.fillEmptyOnly ? weekSides(wkOffset) : [];
+  if(opt.batchSides && sides.length < SIDE_COUNT){
+    sides.forEach(noteUsed);
+    const mainProt = new Set(Object.values(plan).flatMap(day=>Object.values(day||{}).flat()).map(id=>recipes.find(r=>r.id===id)).filter(Boolean).flatMap(mainKeys));
+    sides = sides.concat(pickSides(ctx, mainProt)).slice(0, SIDE_COUNT);
+  }
+  state.sides[wk] = opt.batchSides ? sides : [];
+
   state.plan[wk] = plan;
   saveState();
   return added;
+}
+
+function clearWeek(wkOffset){
+  saveUndo(wkOffset);
+  const wk = weekKey(wkOffset);
+  state.plan[wk] = {};
+  if(state.sides) state.sides[wk] = [];
+  saveState();
 }
 
 function renderAutoModal(){
@@ -2115,11 +2178,13 @@ function renderAutoModal(){
   document.getElementById('autoBody').innerHTML =
     `<div class="opt-group"><div class="ttl">어떤 끼니를 채울까요?</div>
       <div class="opt-grid"><div></div>${MEALS.map(m=>`<div class="h">${m.ic}</div>`).join('')}${row('wd','평일')}${row('we','주말')}</div></div>
-     <div class="opt-group"><div class="ttl">옵션</div>
-      ${line('fillEmptyOnly','이미 정한 메뉴는 그대로 두기')}
-      ${line('side','한식 메인엔 반찬 하나 곁들이기')}
-      ${line('quickWeekday','평일엔 40분 안에 되는 메뉴 위주')}</div>
-     <div class="hint">🧊 냉장고 재료를 많이 쓰는 메뉴, ⭐ 즐겨찾기, 최근 2주에 안 먹은 메뉴를 먼저 골라요. 사야 할 재료가 겹치게 짜서 장보기도 줄여요.</div>`;
+     <div class="opt-group"><div class="ttl">우리집 규칙</div>
+      ${line('batchSides','🥢 일요일에 밑반찬 3개 만들어 한 주 동안 먹기')}
+      ${line('leftover','🍱 화·목은 혼자 — 월·수 저녁을 3인분 만들어 다음 날 먹기')}
+      ${line('quickWeekday','⏱ 평일엔 40분 안에 되는 메뉴 위주')}
+      ${line('fillEmptyOnly','📌 이미 정한 메뉴는 그대로 두기')}</div>
+     <div class="hint">🧊 냉장고 재료를 많이 쓰는 메뉴, ⭐ 즐겨찾기, 최근 2주에 안 먹은 메뉴를 먼저 골라요. 메인은 매일 다르게, 밑반찬과 주재료가 겹치지 않게 짜요. 마음에 안 들면 짠 뒤에 ↩️ 되돌리기를 누르세요.</div>
+     <button class="btn btn-ghost" id="autoClear" style="width:100%;margin-top:2px">🗑 이번 주 식단 비우기</button>`;
 }
 function setAutoOpt(fn){ const o=autoOpt(); fn(o); state.autoOpt=o; saveState(); renderAutoModal(); }
 document.getElementById('autoPlanBtn').onclick=()=>{ renderAutoModal(); openModal('autoModal'); };
@@ -2127,28 +2192,90 @@ document.getElementById('autoBody').addEventListener('click', e=>{
   const c=e.target.closest('[data-meal]'); const l=e.target.closest('[data-opt]');
   if(c){ const [k,m]=c.dataset.meal.split('|'); setAutoOpt(o=>{ o.meals[k]=Object.assign({},o.meals[k]); o.meals[k][m]=!o.meals[k][m]; }); }
   if(l){ const k=l.dataset.opt; setAutoOpt(o=>{ o[k]=!o[k]; }); }
+  if(e.target.closest('#autoClear')){
+    if(!confirm('이번 주 식단과 밑반찬을 모두 비울까요? (↩️ 되돌리기로 되살릴 수 있어요)')) return;
+    clearWeek(weekOffset); closeAllModals(); renderWeek(); toast('🗑 이번 주를 비웠어요');
+  }
 });
 document.getElementById('autoRun').onclick=()=>{
   const n = runAutoPlan(weekOffset);
   closeAllModals(); renderWeek();
   toast(n ? `✨ ${n}끼를 채웠어요` : '채울 빈 칸이 없어요');
 };
+document.getElementById('undoBtn').onclick=()=>{ if(undoAuto()){ renderWeek(); toast('↩️ 되돌렸어요'); } };
+document.getElementById('rerollBtn').onclick=()=>{
+  if(undoAuto()){ const n=runAutoPlan(weekOffset); renderWeek(); toast(`🔄 다시 짰어요 (${n}끼)`); }
+};
+
+// 밑반찬 카드 + 남은 음식 표시를 주간 화면에 덧그림
+function decorateWeek(){
+  const opt = autoOpt();
+  const box = document.getElementById('weekDays');
+  const wk = weekKey(weekOffset);
+  // 밑반찬 카드
+  const sides = weekSides(weekOffset);
+  if(opt.batchSides || sides.length){
+    const sun = mondayOf(weekOffset); sun.setDate(sun.getDate()-1);
+    const card = document.createElement('div');
+    card.className = 'day-card sides-card';
+    card.innerHTML = `<div class="day-head"><span class="dow">🥢 이번 주 밑반찬</span><span class="date">${fmt(sun)}(일)에 만들어 두기</span>
+        ${sides.length?'<button class="mini-btn" id="sidesReroll">🔄 다시 고르기</button>':''}</div>
+      <div class="meal-row"><div class="meal-items">${sides.map(id=>{const r=recipes.find(x=>x.id===id);
+        return `<span class="meal-chip" data-open="${id}">${r.name}<span class="x" data-srm="${id}">✕</span></span>`;}).join('')
+        || '<span class="sides-empty">✨ 자동으로 짜기를 누르면 3개를 골라 드려요</span>'}</div></div>`;
+    box.prepend(card);
+  }
+  // 월·수 3인분 표시, 화·목 남은 음식 표시
+  if(opt.leftover){
+    const plan = state.plan[wk] || {};
+    const cards = box.querySelectorAll('.day-card:not(.sides-card)');
+    cards.forEach((card, di)=>{
+      const rows = card.querySelectorAll('.meal-row');
+      const dRow = rows[2]; if(!dRow) return;
+      if(COOK_BIG[di]) dRow.querySelectorAll('.meal-chip').forEach(c=>{ if(!c.querySelector('.srv')) c.insertAdjacentHTML('afterbegin','<span class="srv">3인분</span>'); });
+      if(LEFTOVER_FROM[di]!==undefined && !((plan[di]||{}).d||[]).length){
+        const src = ((plan[LEFTOVER_FROM[di]]||{}).d||[])[0];
+        const r = src && recipes.find(x=>x.id===src);
+        if(r) dRow.querySelector('.meal-items').insertAdjacentHTML('afterbegin', `<span class="meal-chip leftover" data-open="${r.id}">🍱 ${DOW[LEFTOVER_FROM[di]]} 남은 ${r.name}</span>`);
+      }
+    });
+  }
+  document.getElementById('undoBtn').style.display = (state.autoUndo && state.autoUndo.wk===wk) ? '' : 'none';
+  document.getElementById('rerollBtn').style.display = (state.autoUndo && state.autoUndo.wk===wk) ? '' : 'none';
+}
+document.getElementById('weekDays').addEventListener('click', e=>{
+  const srm=e.target.closest('[data-srm]');
+  if(srm){ e.stopPropagation(); const wk=weekKey(weekOffset); state.sides[wk]=weekSides(weekOffset).filter(id=>id!==srm.dataset.srm); saveState(); renderWeek(); return; }
+  if(e.target.closest('#sidesReroll')){
+    e.stopPropagation(); saveUndo(weekOffset);
+    const wk=weekKey(weekOffset);
+    const ctx = { used:new Set(), recent:recentIds(weekOffset), buy:new Set(), prevCuisine:null, quick:false };
+    const plan = state.plan[wk]||{};
+    Object.values(plan).forEach(day=>Object.values(day||{}).forEach(ids=>(ids||[]).forEach(id=>ctx.used.add(id))));
+    weekSides(weekOffset).forEach(id=>ctx.used.add(id));   // 지금 것과 다른 걸로
+    state.sides[wk] = pickSides(ctx); saveState(); renderWeek(); toast('🥢 밑반찬을 다시 골랐어요');
+  }
+}, true);
 
 // ===== 장보기 목록 =====
 // 이번 주 식단에서 냉장고에 없는 재료를 모아요 (같은 재료는 하나로 합침)
 function shoppingList(wkOffset){
   const plan = state.plan[weekKey(wkOffset)] || {};
-  const items = [];   // {key, name, uses:[{recipe, amount}]}
-  Object.keys(plan).sort().forEach(di=>MEALS.forEach(m=>((plan[di]||{})[m.k]||[]).forEach(id=>{
+  const lo = autoOpt().leftover;
+  const items = [];   // {key, name, uses:[{recipe, amount, day}]}
+  const addRecipe = (id, day, big)=>{
     const r = recipes.find(x=>x.id===id); if(!r) return;
     r.ing.forEach(i=>{
       if(!needBuy(i)) return;
       const key = coreNoun(i.n);
       let it = items.find(x=>x.key===key);
       if(!it){ it={key, name:i.n, uses:[]}; items.push(it); }
-      it.uses.push({recipe:r.name, amount:i.a||'', day:DOW[di]});
+      it.uses.push({recipe:r.name, amount:(i.a||'')+(big?' ×1.5':''), day});
     });
-  })));
+  };
+  weekSides(wkOffset).forEach(id=>addRecipe(id, '밑반찬', false));
+  Object.keys(plan).sort().forEach(di=>MEALS.forEach(m=>((plan[di]||{})[m.k]||[]).forEach(id=>
+    addRecipe(id, DOW[di], lo && m.k==='d' && COOK_BIG[di]))));
   return items;
 }
 function shopState(){ state.shop = state.shop || {}; const wk=weekKey(weekOffset); state.shop[wk]=state.shop[wk]||{done:[]}; return state.shop[wk]; }
@@ -2202,7 +2329,7 @@ document.getElementById('shopToFridge').onclick=()=>{
 
 // 주간 화면이 다시 그려질 때 장보기 개수도 갱신
 const _renderWeekBase = renderWeek;
-renderWeek = function(){ _renderWeekBase(); updateShopCount(); };
+renderWeek = function(){ _renderWeekBase(); decorateWeek(); updateShopCount(); };
 
 // ===== 시작 =====
 renderWeek();
